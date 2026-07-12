@@ -361,9 +361,6 @@ def dashboard():
 @app.route('/admin', methods=['GET'])
 @login_required
 def admin():
-    current = current_user()
-    if not current or (current.role or '') != 'Admin':
-        return redirect(url_for('dashboard'))
     return render_app_page('admin.html', 'admin', 'Admin Console', 'Manage departments, assets, users, and system state.')
 
 
