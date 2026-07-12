@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Report Asset Issue</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: Arial, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      background: #f4f6f9;
+      color: #222;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 40px auto;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+
+    .header {
+      background: #1f4b99;
+      color: #fff;
+      padding: 24px 30px;
+    }
+
+    .header h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+    }
+
+    .header p {
+      margin: 0;
+      opacity: 0.95;
+    }
+
+    .content {
+      padding: 30px;
+    }
+
+    .section {
+      margin-bottom: 24px;
+    }
+
+    .section h2 {
+      font-size: 18px;
+      margin-bottom: 14px;
+      color: #1f4b99;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    input, select, textarea {
+      padding: 12px 14px;
+      border: 1px solid #ccd3dd;
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+      background: #fff;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: #1f4b99;
+    }
+
+    textarea {
+      min-height: 140px;
+      resize: vertical;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    button {
+      border: none;
+      padding: 12px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .btn-primary {
+      background: #1f4b99;
+      color: white;
+    }
+
+    .btn-secondary {
+      background: #e9edf5;
+      color: #222;
+    }
+
+    .note {
+      font-size: 13px;
+      color: #666;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Report Asset Issue</h1>
+      <p>Fill in the complaint details below.</p>
+    </div>
+
+    <div class="content">
+      <form>
+        <div class="section">
+          <h2>Reporter Information</h2>
+          <div class="grid">
+            <div class="form-group">
+              <label for="reporter">Your Name</label>
+              <input type="text" id="reporter" placeholder="Enter your name" />
+            </div>
+
+            <div class="form-group">
+              <label for="email">Email</label>
+              <input type="email" id="email" placeholder="Enter your email" />
+            </div>
+
+            <div class="form-group">
+              <label for="dept">Department</label>
+              <input type="text" id="dept" placeholder="Enter your department" />
+            </div>
+
+            <div class="form-group">
+              <label for="date">Date Reported</label>
+              <input type="date" id="date" />
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Issue Details</h2>
+          <div class="grid">
+            <div class="form-group">
+              <label for="type">Issue Type</label>
+              <select id="type">
+                <option value="">Select issue type</option>
+                <option>Damage</option>
+                <option>Missing Item</option>
+                <option>Not Working</option>
+                <option>Replacement Needed</option>
+                <option>Delivery Issue</option>
+                <option>Other</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="priority">Priority</label>
+              <select id="priority">
+                <option value="">Select priority</option>
+                <option>Low</option>
+                <option>Medium</option>
+                <option>High</option>
+                <option>Critical</option>
+              </select>
+            </div>
+          </div>
+
+          <br />
+
+          <div class="form-group">
+            <label for="title">Short Title</label>
+            <input type="text" id="title" placeholder="Enter complaint title" />
+          </div>
+
+          <br />
+
+          <div class="form-group">
+            <label for="details">Complaint Details</label>
+            <textarea id="details" placeholder="Describe the issue in detail..."></textarea>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Attachments</h2>
+          <div class="form-group">
+            <label for="file">Upload Photo / Document</label>
+            <input type="file" id="file" />
+          </div>
+          <p class="note">Attach proof if available.</p>
+        </div>
+
+        <div class="actions">
+          <button type="submit" class="btn-primary">Submit Complaint</button>
+          <button type="reset" class="btn-secondary">Clear Form</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>
