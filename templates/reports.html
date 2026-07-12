@@ -1,220 +1,184 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Report Asset Issue</title>
-  <style>
-    * {
-      box-sizing: border-box;
-      font-family: Arial, sans-serif;
-    }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FlowCore - Report Issue</title>
 
-    body {
-      margin: 0;
-      background: #f4f6f9;
-      color: #222;
-    }
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
-    .container {
-      max-width: 800px;
-      margin: 40px auto;
-      background: #fff;
-      border-radius: 12px;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.08);
-      overflow: hidden;
-    }
+<style>
+body{
+    background:#eef3ff;
+    font-family:'Segoe UI',sans-serif;
+}
 
-    .header {
-      background: #1f4b99;
-      color: #fff;
-      padding: 24px 30px;
-    }
+.card{
+    border:none;
+    border-radius:18px;
+    box-shadow:0 10px 30px rgba(0,0,0,.08);
+}
 
-    .header h1 {
-      margin: 0 0 8px;
-      font-size: 28px;
-    }
+.page-title{
+    color:#4f46e5;
+    font-weight:700;
+}
 
-    .header p {
-      margin: 0;
-      opacity: 0.95;
-    }
+.form-control,
+.form-select{
+    border-radius:12px;
+    padding:12px;
+}
 
-    .content {
-      padding: 30px;
-    }
+.form-control:focus,
+.form-select:focus{
+    border-color:#4f46e5;
+    box-shadow:0 0 0 .15rem rgba(79,70,229,.25);
+}
 
-    .section {
-      margin-bottom: 24px;
-    }
+.btn-primary{
+    background:linear-gradient(135deg,#4f46e5,#6366f1);
+    border:none;
+    border-radius:12px;
+    padding:12px;
+    font-weight:600;
+    transition:.3s;
+}
 
-    .section h2 {
-      font-size: 18px;
-      margin-bottom: 14px;
-      color: #1f4b99;
-    }
+.btn-primary:hover{
+    opacity:.9;
+}
 
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 16px;
-    }
+.badge-report{
+    background:#eef2ff;
+    color:#4f46e5;
+    padding:8px 16px;
+    border-radius:20px;
+    font-weight:600;
+}
 
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
+textarea{
+    resize:none;
+}
+</style>
 
-    label {
-      font-weight: 600;
-      font-size: 14px;
-    }
-
-    input, select, textarea {
-      padding: 12px 14px;
-      border: 1px solid #ccd3dd;
-      border-radius: 8px;
-      font-size: 14px;
-      outline: none;
-      background: #fff;
-    }
-
-    input:focus, select:focus, textarea:focus {
-      border-color: #1f4b99;
-    }
-
-    textarea {
-      min-height: 140px;
-      resize: vertical;
-    }
-
-    .actions {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-      margin-top: 10px;
-    }
-
-    button {
-      border: none;
-      padding: 12px 18px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 600;
-    }
-
-    .btn-primary {
-      background: #1f4b99;
-      color: white;
-    }
-
-    .btn-secondary {
-      background: #e9edf5;
-      color: #222;
-    }
-
-    .note {
-      font-size: 13px;
-      color: #666;
-      margin-top: 8px;
-    }
-  </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <h1>Report Asset Issue</h1>
-      <p>Fill in the complaint details below.</p>
+
+<div class="container py-5">
+
+    <div class="row justify-content-center">
+
+        <div class="col-lg-8">
+
+            <div class="card p-4">
+
+                <div class="d-flex justify-content-between align-items-center mb-4">
+
+                    <div>
+                        <h2 class="page-title">Report Issue</h2>
+                        <p class="text-muted mb-0">
+                            Report an issue related to an asset.
+                        </p>
+                    </div>
+
+                    <span class="badge-report">
+                        Report
+                    </span>
+
+                </div>
+
+                <form>
+
+                    <div class="mb-3">
+                        <label class="form-label">Asset</label>
+                        <select class="form-select">
+                            <option selected>Select Asset</option>
+                            <option>AF-0001 • Dell Latitude 5420</option>
+                            <option>AF-0002 • HP Printer</option>
+                            <option>AF-0003 • Projector</option>
+                            <option>AF-0004 • Office Chair</option>
+                        </select>
+                    </div>
+
+                    <div class="row">
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Issue Category</label>
+                            <select class="form-select">
+                                <option selected>Select Category</option>
+                                <option>Asset Damaged</option>
+                                <option>Asset Missing</option>
+                                <option>Malfunction</option>
+                                <option>Wrong Allocation</option>
+                                <option>Lost Asset</option>
+                                <option>Other</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Priority</label>
+                            <select class="form-select">
+                                <option>Low</option>
+                                <option selected>Medium</option>
+                                <option>High</option>
+                                <option>Critical</option>
+                            </select>
+                        </div>
+
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Issue Title</label>
+                        <input
+                            type="text"
+                            class="form-control"
+                            placeholder="Enter a short title">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Issue Description</label>
+                        <textarea
+                            class="form-control"
+                            rows="5"
+                            placeholder="Describe the issue in detail..."></textarea>
+                    </div>
+
+                    <div class="row">
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Reported By</label>
+                            <input
+                                type="text"
+                                class="form-control"
+                                value="John Doe"
+                                readonly>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Report Date</label>
+                            <input
+                                type="date"
+                                class="form-control">
+                        </div>
+
+                    </div>
+
+                    <div class="d-grid mt-3">
+                        <button type="submit" class="btn btn-primary">
+                            Submit Report
+                        </button>
+                    </div>
+
+                </form>
+
+            </div>
+
+        </div>
+
     </div>
 
-    <div class="content">
-      <form>
-        <div class="section">
-          <h2>Reporter Information</h2>
-          <div class="grid">
-            <div class="form-group">
-              <label for="reporter">Your Name</label>
-              <input type="text" id="reporter" placeholder="Enter your name" />
-            </div>
+</div>
 
-            <div class="form-group">
-              <label for="email">Email</label>
-              <input type="email" id="email" placeholder="Enter your email" />
-            </div>
-
-            <div class="form-group">
-              <label for="dept">Department</label>
-              <input type="text" id="dept" placeholder="Enter your department" />
-            </div>
-
-            <div class="form-group">
-              <label for="date">Date Reported</label>
-              <input type="date" id="date" />
-            </div>
-          </div>
-        </div>
-
-        <div class="section">
-          <h2>Issue Details</h2>
-          <div class="grid">
-            <div class="form-group">
-              <label for="type">Issue Type</label>
-              <select id="type">
-                <option value="">Select issue type</option>
-                <option>Damage</option>
-                <option>Missing Item</option>
-                <option>Not Working</option>
-                <option>Replacement Needed</option>
-                <option>Delivery Issue</option>
-                <option>Other</option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label for="priority">Priority</label>
-              <select id="priority">
-                <option value="">Select priority</option>
-                <option>Low</option>
-                <option>Medium</option>
-                <option>High</option>
-                <option>Critical</option>
-              </select>
-            </div>
-          </div>
-
-          <br />
-
-          <div class="form-group">
-            <label for="title">Short Title</label>
-            <input type="text" id="title" placeholder="Enter complaint title" />
-          </div>
-
-          <br />
-
-          <div class="form-group">
-            <label for="details">Complaint Details</label>
-            <textarea id="details" placeholder="Describe the issue in detail..."></textarea>
-          </div>
-        </div>
-
-        <div class="section">
-          <h2>Attachments</h2>
-          <div class="form-group">
-            <label for="file">Upload Photo / Document</label>
-            <input type="file" id="file" />
-          </div>
-          <p class="note">Attach proof if available.</p>
-        </div>
-
-        <div class="actions">
-          <button type="submit" class="btn-primary">Submit Complaint</button>
-          <button type="reset" class="btn-secondary">Clear Form</button>
-        </div>
-      </form>
-    </div>
-  </div>
 </body>
 </html>
