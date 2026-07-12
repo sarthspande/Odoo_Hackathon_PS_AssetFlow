@@ -21,9 +21,13 @@ socketio = SocketIO(app, cors_allowed_origins='*')
 
 from DBinitialisation import db
 
-@app.route('/login', methods=['GET','POST'])
+@app.route('/', methods=['GET','POST'])
 def login():
     return render_template("login.html")
+
+@app.route('/dashboard', methods=['GET','POST'])
+def dashboard():
+    return render_template("dashboard.html")
 
 @socketio.on('login')
 def handle_login(data):
