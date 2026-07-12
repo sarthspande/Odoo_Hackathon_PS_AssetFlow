@@ -3,133 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login / Register</title>
+    <title>FlowCore — Login</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script defer src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
 </head>
 <body class="auth-page">
-    <div class="container" x-data="authTabs('{{ active_tab|default('login') }}')" x-init="init()">
+    <div class="container" x-data="loginPage()" x-init="init()">
         <div class="panel">
-            <div class="panel-header">
-                <h1 class="header-title">Account Access</h1>
-                <p class="header-subtitle">Login or register to continue.</p>
+            <div class="panel-header" style="display:block;">
+                <h1 class="header-title" style="margin-bottom:4px;">Welcome back</h1>
+                <p class="header-subtitle">Login to your FlowCore account.</p>
             </div>
+
             <template x-if="errorMessage">
-                <div class="toast show" style="background:#f8d7da;color:#842029;margin:0 0 1rem;" x-text="errorMessage"></div>
+                <div class="toast show" style="position:static;transform:none;background:#fef2f2;color:#b91c1c;margin:0 0 16px;width:100%;box-sizing:border-box;" x-text="errorMessage"></div>
             </template>
             {% if error %}
-                <div class="toast show" style="background:#f8d7da;color:#842029;margin:0 0 1rem;">{{ error }}</div>
+                <div class="toast show" style="position:static;transform:none;background:#fef2f2;color:#b91c1c;margin:0 0 16px;width:100%;box-sizing:border-box;">{{ error }}</div>
             {% endif %}
-            <div class="tabs">
-                <button type="button" class="tab-button" :class="activeTab === 'login' ? 'active' : ''" @click="activeTab='login'">Login</button>
-                <button type="button" class="tab-button" :class="activeTab === 'register' ? 'active' : ''" @click="activeTab='register'">Register</button>
-            </div>
 
-            <template x-if="activeTab === 'login'">
-                <form @submit.prevent="submitLogin" action="{{ url_for('login') }}" method="post" class="form-grid">
-                    <div>
-                        <label class="form-label" for="employee_id">Employee ID</label>
-                        <input class="input" type="text" id="employee_id" name="employee_id" placeholder="Employee ID" x-model="loginForm.employee_id">
-                    </div>
-                    <div>
-                        <label class="form-label" for="email">Email</label>
-                        <input class="input" type="email" id="email" name="email" placeholder="Email address" x-model="loginForm.email">
-                    </div>
-                    <div>
-                        <label class="form-label" for="password">Password</label>
-                        <input class="input" type="password" id="password" name="password" placeholder="Password" x-model="loginForm.password" required>
-                    </div>
-                    <div class="panel-row">
-                        <button class="button" type="submit">Login</button>
-                    </div>
-                </form>
-            </template>
+            <form @submit.prevent="submitLogin" action="{{ url_for('login') }}" method="post" class="form-grid" style="grid-template-columns:1fr;">
+                <div>
+                    <label class="form-label" for="employee_id">Employee ID</label>
+                    <input class="input" type="text" id="employee_id" name="employee_id" placeholder="Employee ID" x-model="form.employee_id">
+                </div>
+                <div>
+                    <label class="form-label" for="email">Email</label>
+                    <input class="input" type="email" id="email" name="email" placeholder="Email address" x-model="form.email">
+                </div>
+                <p style="text-align:center;color:#94a3b8;font-size:0.8rem;margin:-8px 0;">Enter your Employee ID or Email</p>
+                <div>
+                    <label class="form-label" for="password">Password</label>
+                    <input class="input" type="password" id="password" name="password" placeholder="Password" x-model="form.password" required>
+                </div>
+                <button class="button" type="submit" style="width:100%;justify-content:center;">Login</button>
+            </form>
 
-            <template x-if="activeTab === 'register'">
-                <form @submit.prevent="submitRegister" action="{{ url_for('register') }}" method="post" class="form-grid">
-                    <div>
-                        <label class="form-label" for="name">Full Name</label>
-                        <input class="input" type="text" id="name" name="name" placeholder="Full name" x-model="registerForm.name" required>
-                    </div>
-                    <div>
-                        <label class="form-label" for="register_email">Email</label>
-                        <input class="input" type="email" id="register_email" name="email" placeholder="Email address" x-model="registerForm.email" required>
-                    </div>
-                    <div>
-                        <label class="form-label" for="register_password">Password</label>
-                        <input class="input" type="password" id="register_password" name="password" placeholder="Password" x-model="registerForm.password" required>
-                    </div>
-                    <div>
-                        <label class="form-label" for="department_name">Department</label>
-                        <input class="input" type="text" id="department_name" name="department_name" placeholder="Department" x-model="registerForm.department_name">
-                    </div>
-                    <div>
-                        <label class="form-label" for="role">Role</label>
-                        <select class="select" id="role" name="role" x-model="registerForm.role">
-                            <option value="Employee">Employee</option>
-                            <option value="Asset Manager">Asset Manager</option>
-                            <option value="Department Head">Department Head</option>
-                            <option value="Admin">Admin</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="form-label" for="status">Status</label>
-                        <select class="select" id="status" name="status" x-model="registerForm.status">
-                            <option value="Active">Active</option>
-                            <option value="Inactive">Inactive</option>
-                        </select>
-                    </div>
-                    <div class="panel-row">
-                        <button class="button" type="submit">Register</button>
-                    </div>
-                </form>
-            </template>
+            <p class="auth-links">Don't have an account? <a href="{{ url_for('register') }}">Register here</a></p>
         </div>
     </div>
 
     <script>
-        function authTabs(initialTab) {
+        function loginPage() {
             return {
-                activeTab: initialTab || 'login',
                 errorMessage: '',
                 socket: null,
-                loginForm: {
-                    employee_id: '',
-                    email: '',
-                    password: ''
-                },
-                registerForm: {
-                    name: '',
-                    email: '',
-                    password: '',
-                    department_name: '',
-                    role: 'Employee',
-                    status: 'Active'
-                },
+                socketConnected: false,
+                form: { employee_id: '', email: '', password: '' },
                 init() {
+                    if (typeof io === 'undefined') return;
                     this.socket = io();
-                    this.socketConnected = false;
-                    this.socket.on('connect', () => {
-                        this.socketConnected = true;
-                    });
-                    this.socket.on('disconnect', () => {
-                        this.socketConnected = false;
-                    });
-                    this.socket.on('connect_error', () => {
-                        this.socketConnected = false;
-                    });
+                    this.socket.on('connect', () => this.socketConnected = true);
+                    this.socket.on('disconnect', () => this.socketConnected = false);
+                    this.socket.on('connect_error', () => this.socketConnected = false);
                     this.socket.on('login_response', (response) => {
                         if (!response.success) {
                             this.errorMessage = response.error || 'Login failed.';
-                            return;
-                        }
-                        window.location.href = response.redirect;
-                    });
-                    this.socket.on('register_response', (response) => {
-                        if (!response.success) {
-                            this.errorMessage = response.error || 'Registration failed.';
                             return;
                         }
                         window.location.href = response.redirect;
@@ -138,64 +69,17 @@
                 submitLogin() {
                     this.errorMessage = '';
                     if (!this.socket || !this.socketConnected) {
-                        return this.loginFallback();
+                        return this.fallback();
                     }
-                    let timeout = setTimeout(() => this.loginFallback(), 3000);
-                    this.socket.emit('login', {
-                        employee_id: this.loginForm.employee_id,
-                        email: this.loginForm.email,
-                        password: this.loginForm.password
-                    });
+                    const timeout = setTimeout(() => this.fallback(), 3000);
+                    this.socket.emit('login', { ...this.form });
                     this.socket.once('login_response', () => clearTimeout(timeout));
                 },
-                loginFallback() {
+                fallback() {
                     const form = document.createElement('form');
                     form.method = 'POST';
                     form.action = '{{ url_for("login") }}';
-                    const fields = {
-                        employee_id: this.loginForm.employee_id,
-                        email: this.loginForm.email,
-                        password: this.loginForm.password
-                    };
-                    Object.entries(fields).forEach(([name, value]) => {
-                        const input = document.createElement('input');
-                        input.type = 'hidden';
-                        input.name = name;
-                        input.value = value || '';
-                        form.appendChild(input);
-                    });
-                    document.body.appendChild(form);
-                    form.submit();
-                },
-                submitRegister() {
-                    this.errorMessage = '';
-                    if (!this.socket || !this.socketConnected) {
-                        return this.registerFallback();
-                    }
-                    let timeout = setTimeout(() => this.registerFallback(), 3000);
-                    this.socket.emit('register', {
-                        name: this.registerForm.name,
-                        email: this.registerForm.email,
-                        password: this.registerForm.password,
-                        department_name: this.registerForm.department_name,
-                        role: this.registerForm.role,
-                        status: this.registerForm.status
-                    });
-                    this.socket.once('register_response', () => clearTimeout(timeout));
-                },
-                registerFallback() {
-                    const form = document.createElement('form');
-                    form.method = 'POST';
-                    form.action = '{{ url_for("register") }}';
-                    const fields = {
-                        name: this.registerForm.name,
-                        email: this.registerForm.email,
-                        password: this.registerForm.password,
-                        department_name: this.registerForm.department_name,
-                        role: this.registerForm.role,
-                        status: this.registerForm.status
-                    };
-                    Object.entries(fields).forEach(([name, value]) => {
+                    Object.entries(this.form).forEach(([name, value]) => {
                         const input = document.createElement('input');
                         input.type = 'hidden';
                         input.name = name;

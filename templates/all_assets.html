@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block content %}
+<div x-data="allAssetsPage()" x-init="init()">
+
+  <div class="panel">
+    <div class="panel-header">
+      <h2>All Assets</h2>
+      <div class="panel-row">
+        <input class="input" style="max-width:220px;" type="text" placeholder="Search name or tag…" x-model="query">
+        <select class="select" style="max-width:180px;" x-model="statusFilter">
+          <option value="">All statuses</option>
+          <option>Available</option>
+          <option>Allocated</option>
+          <option>Reserved</option>
+          <option>Under Maintenance</option>
+          <option>Lost</option>
+          <option>Retired</option>
+          <option>Disposed</option>
+        </select>
+        {% if current_user.can_manage_assets %}
+        <a href="{{ url_for('reports') }}" class="button-secondary">Report Issue</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="table-wrapper">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>ID</th><th>Name</th><th>Tag</th><th>Category</th><th>Condition</th><th>Location</th><th>Bookable</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="asset in filteredAssets" :key="asset.asset_id">
+            <tr>
+              <td x-text="asset.asset_id"></td>
+              <td x-text="asset.name"></td>
+              <td x-text="asset.asset_tag"></td>
+              <td x-text="asset.category_name || '—'"></td>
+              <td x-text="asset.condition"></td>
+              <td x-text="asset.location"></td>
+              <td x-text="asset.is_bookable ? 'Yes' : 'No'"></td>
+              <td><span class="badge" :class="statusBadge(asset.status)" x-text="asset.status"></span></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+      <p class="empty-state" x-show="!loading && filteredAssets.length === 0">No assets match your filters.</p>
+      <p class="empty-state" x-show="loading">Loading assets…</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function allAssetsPage() {
+  return {
+    assets: [],
+    loading: true,
+    query: '',
+    statusFilter: '',
+
+    init() {
+      fetch('/api/assets')
+        .then(res => res.json())
+        .then(data => { this.assets = data; this.loading = false; })
+        .catch(() => { this.loading = false; shellNotify('Failed to load assets.'); });
+    },
+
+    statusBadge(status) {
+      const map = {
+        Available: 'badge-available', Allocated: 'badge-allocated', Reserved: 'badge-reserved',
+        'Under Maintenance': 'badge-maintenance', Lost: 'badge-lost', Retired: 'badge-retired', Disposed: 'badge-disposed'
+      };
+      return map[status] || 'badge-available';
+    },
+
+    get filteredAssets() {
+      const q = this.query.trim().toLowerCase();
+      return this.assets.filter(a => {
+        const matchesQuery = !q || (a.name || '').toLowerCase().includes(q) || (a.asset_tag || '').toLowerCase().includes(q);
+        const matchesStatus = !this.statusFilter || a.status === this.statusFilter;
+        return matchesQuery && matchesStatus;
+      });
+    }
+  };
+}
+</script>
+{% endblock %}

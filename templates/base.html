@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FlowCore — {% block title %}{{ page_title }}{% endblock %}</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          brand: {
+            50: '#eef2ff', 100: '#e0e7ff', 200: '#c7d2fe', 300: '#a5b4fc',
+            400: '#818cf8', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca',
+            800: '#3730a3', 900: '#312e81'
+          }
+        },
+        fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] }
+      }
+    }
+  }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+{% block extra_head %}{% endblock %}
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased" x-data="appShell()" x-init="init()">
+
+  <div x-show="sidebarOpen" x-cloak @click="sidebarOpen = false"
+       x-transition:enter="transition-opacity ease-linear duration-200"
+       x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+       x-transition:leave="transition-opacity ease-linear duration-150"
+       x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+       class="app-overlay"></div>
+
+  <div class="app-shell">
+    <aside class="app-sidebar" :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'">
+      <div class="app-sidebar-brand">
+        <div class="app-sidebar-logo">FC</div>
+        <div>
+          <p class="app-sidebar-title">FlowCore</p>
+          <p class="app-sidebar-subtitle">Asset Management System</p>
+        </div>
+        <button @click="sidebarOpen = false" class="ml-auto lg:hidden text-slate-400 hover:text-white">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+
+      <nav class="app-sidebar-nav">
+        {% for section in nav_sections %}
+        <div class="nav-section">
+          <p class="nav-section-label">{{ section.label }}</p>
+          {% for item in section.links %}
+            {% if item.soon %}
+            <div class="nav-link nav-link-soon">
+              <span class="flex items-center gap-2.5">{{ item.icon|safe }}{{ item.name }}</span>
+              <span class="nav-soon-badge">Soon</span>
+            </div>
+            {% else %}
+            <a href="{{ item.href }}" class="nav-link {{ 'nav-link-active' if active_nav == item.key else '' }}">
+              {{ item.icon|safe }}{{ item.name }}
+            </a>
+            {% endif %}
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </nav>
+
+      <div class="app-sidebar-footer">
+        <div class="app-user-chip">
+          <div class="app-avatar">{{ current_user.initials }}</div>
+          <div class="min-w-0 leading-tight">
+            <p class="app-user-name truncate">{{ current_user.name }}</p>
+            <p class="app-user-role truncate">{{ current_user.role }}</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <div class="app-main">
+      <header class="app-topbar">
+        <button @click="sidebarOpen = true" class="app-sidebar-toggle">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" /></svg>
+        </button>
+        <div class="min-w-0">
+          <h1 class="app-topbar-title">{% block header_title %}{{ page_title }}{% endblock %}</h1>
+          <p class="app-topbar-subtitle">{% block header_subtitle %}{{ page_subtitle }}{% endblock %}</p>
+        </div>
+
+        <div class="ml-auto flex items-center gap-2">
+          <span class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-white border border-slate-200 text-slate-600 shadow-sm">
+            <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+            {{ current_user.name }} &middot; {{ current_user.role }}
+          </span>
+          <a href="{{ url_for('logout') }}" class="button-secondary">Logout</a>
+        </div>
+      </header>
+
+      <main class="app-content">
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
+
+  <div :class="['toast', toast.show ? 'show' : '']" x-text="toast.message"></div>
+
+<script>
+function appShell() {
+  return {
+    sidebarOpen: false,
+    toast: { show: false, message: '' },
+    init() {},
+    notify(message) {
+      this.toast.message = message;
+      this.toast.show = true;
+      clearTimeout(this._toastTimer);
+      this._toastTimer = setTimeout(() => { this.toast.show = false; }, 2500);
+    }
+  };
+}
+
+// Small helper so page-scripts can reach the shell's toast without prop drilling.
+function shellNotify(message) {
+  const el = document.querySelector('body');
+  if (el && el.__x) {
+    el.__x.$data.notify(message);
+  } else {
+    console.log(message);
+  }
+}
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

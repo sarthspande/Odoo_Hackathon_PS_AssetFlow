@@ -1,5 +1,7 @@
 from . import db
 from datetime import datetime
+
+
 class Department(db.Model):
     __tablename__ = 'departments'
     department_id = db.Column(db.Integer, primary_key=True)
@@ -7,6 +9,9 @@ class Department(db.Model):
     department_head_id = db.Column(db.Integer, db.ForeignKey('employees.employee_id'))
     parent_department_id = db.Column(db.Integer, db.ForeignKey('departments.department_id'))
     status = db.Column(db.String(20), default='Active')
+
+    head = db.relationship('Employee', foreign_keys=[department_head_id])
+
 
 class Employee(db.Model):
     __tablename__ = 'employees'
@@ -18,11 +23,15 @@ class Employee(db.Model):
     role = db.Column(db.String(50), default='Employee')
     status = db.Column(db.String(20), default='Active')
 
+    department = db.relationship('Department', foreign_keys=[department_id], backref='employees')
+
+
 class AssetCategory(db.Model):
     __tablename__ = 'asset_categories'
     category_id = db.Column(db.Integer, primary_key=True)
     category_name = db.Column(db.String(100), nullable=False)
     warranty_period = db.Column(db.String(50))
+
 
 class Asset(db.Model):
     __tablename__ = 'assets'
@@ -39,6 +48,9 @@ class Asset(db.Model):
     is_bookable = db.Column(db.Boolean, default=False)
     status = db.Column(db.String(50), default='Available')
 
+    category = db.relationship('AssetCategory', backref='assets')
+
+
 class Allocation(db.Model):
     __tablename__ = 'allocations'
     allocation_id = db.Column(db.Integer, primary_key=True)
@@ -46,6 +58,10 @@ class Allocation(db.Model):
     employee_id = db.Column(db.Integer, db.ForeignKey('employees.employee_id'))
     allocation_date = db.Column(db.DateTime, default=datetime.utcnow)
     expected_return_date = db.Column(db.DateTime)
+
+    asset = db.relationship('Asset', backref='allocations')
+    employee = db.relationship('Employee', backref='allocations')
+
 
 class Booking(db.Model):
     __tablename__ = 'bookings'
@@ -56,6 +72,10 @@ class Booking(db.Model):
     end_time = db.Column(db.DateTime, nullable=False)
     status = db.Column(db.String(50), default='Upcoming')
 
+    asset = db.relationship('Asset', backref='bookings')
+    employee = db.relationship('Employee', backref='bookings')
+
+
 class MaintenanceRequest(db.Model):
     __tablename__ = 'maintenance_requests'
     maintenance_id = db.Column(db.Integer, primary_key=True)
@@ -65,6 +85,9 @@ class MaintenanceRequest(db.Model):
     photo_url = db.Column(db.String(255))
     status = db.Column(db.String(50), default='Pending')
 
+    asset = db.relationship('Asset', backref='maintenance_requests')
+
+
 class AuditCycle(db.Model):
     __tablename__ = 'audit_cycles'
     audit_id = db.Column(db.Integer, primary_key=True)
@@ -73,6 +96,7 @@ class AuditCycle(db.Model):
     end_date = db.Column(db.Date)
     status = db.Column(db.String(20), default='Open')
 
+
 class AuditDetail(db.Model):
     __tablename__ = 'audit_details'
     audit_detail_id = db.Column(db.Integer, primary_key=True)
@@ -80,6 +104,11 @@ class AuditDetail(db.Model):
     asset_id = db.Column(db.Integer, db.ForeignKey('assets.asset_id'))
     auditor_id = db.Column(db.Integer, db.ForeignKey('employees.employee_id'))
     verification_status = db.Column(db.String(50))
+
+    audit = db.relationship('AuditCycle', backref='details')
+    asset = db.relationship('Asset', backref='audit_details')
+    auditor = db.relationship('Employee', backref='audit_details')
+
 
 class ActivityLog(db.Model):
     __tablename__ = 'activity_logs'

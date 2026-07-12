@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+{% endblock %}
+{% block content %}
+<div x-data="analyticsPage()" x-init="init()">
+  <template x-if="loading">
+    <p class="empty-state">Loading analytics…</p>
+  </template>
+
+  <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+    <div class="panel">
+      <div class="panel-header"><h2>Assets by Status</h2></div>
+      <canvas id="chartAssetsByStatus" height="220"></canvas>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><h2>Assets by Category</h2></div>
+      <canvas id="chartAssetsByCategory" height="220"></canvas>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><h2>Employees by Department</h2></div>
+      <canvas id="chartEmployeesByDept" height="220"></canvas>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><h2>Maintenance Requests by Priority</h2></div>
+      <canvas id="chartMaintenanceByPriority" height="220"></canvas>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function analyticsPage() {
+  return {
+    loading: true,
+    init() {
+      fetch('/api/analytics')
+        .then(res => res.json())
+        .then(data => { this.loading = false; this.$nextTick(() => this.renderCharts(data)); })
+        .catch(() => { this.loading = false; shellNotify('Failed to load analytics.'); });
+    },
+    renderCharts(data) {
+      const palette = ['#4f46e5', '#6366f1', '#818cf8', '#a5b4fc', '#c7d2fe', '#f59e0b', '#10b981', '#ef4444'];
+      const makeBar = (id, labels, values) => {
+        const ctx = document.getElementById(id);
+        if (!ctx) return;
+        new Chart(ctx, {
+          type: 'bar',
+          data: { labels, datasets: [{ data: values, backgroundColor: palette }] },
+          options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+        });
+      };
+      makeBar('chartAssetsByStatus', Object.keys(data.assets_by_status), Object.values(data.assets_by_status));
+      makeBar('chartAssetsByCategory', Object.keys(data.assets_by_category), Object.values(data.assets_by_category));
+      makeBar('chartEmployeesByDept', Object.keys(data.employees_by_department), Object.values(data.employees_by_department));
+      makeBar('chartMaintenanceByPriority', Object.keys(data.maintenance_by_priority), Object.values(data.maintenance_by_priority));
+    }
+  };
+}
+</script>
+{% endblock %}

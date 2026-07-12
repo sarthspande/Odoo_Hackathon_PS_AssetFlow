@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlowCore — Register</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script defer src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+</head>
+<body class="auth-page">
+    <div class="container" x-data="registerPage()" x-init="init()">
+        <div class="panel">
+            <div class="panel-header" style="display:block;">
+                <h1 class="header-title" style="margin-bottom:4px;">Create your account</h1>
+                <p class="header-subtitle">Register to start using FlowCore.</p>
+            </div>
+
+            <template x-if="errorMessage">
+                <div class="toast show" style="position:static;transform:none;background:#fef2f2;color:#b91c1c;margin:0 0 16px;width:100%;box-sizing:border-box;" x-text="errorMessage"></div>
+            </template>
+            {% if error %}
+                <div class="toast show" style="position:static;transform:none;background:#fef2f2;color:#b91c1c;margin:0 0 16px;width:100%;box-sizing:border-box;">{{ error }}</div>
+            {% endif %}
+
+            <form @submit.prevent="submitRegister" action="{{ url_for('register') }}" method="post" class="form-grid">
+                <div>
+                    <label class="form-label" for="name">Full Name</label>
+                    <input class="input" type="text" id="name" name="name" placeholder="Full name" x-model="form.name" required>
+                </div>
+                <div>
+                    <label class="form-label" for="email">Email</label>
+                    <input class="input" type="email" id="email" name="email" placeholder="Email address" x-model="form.email" required>
+                </div>
+                <div>
+                    <label class="form-label" for="password">Password</label>
+                    <input class="input" type="password" id="password" name="password" placeholder="Password" x-model="form.password" required>
+                </div>
+                <div>
+                    <label class="form-label" for="department_name">Department</label>
+                    <input class="input" type="text" id="department_name" name="department_name" placeholder="Department" x-model="form.department_name">
+                </div>
+                <div>
+                    <label class="form-label" for="role">Role</label>
+                    <select class="select" id="role" name="role" x-model="form.role">
+                        <option value="Employee">Employee</option>
+                        <option value="Asset Manager">Asset Manager</option>
+                        <option value="Department Head">Department Head</option>
+                        <option value="Admin">Admin</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label" for="status">Status</label>
+                    <select class="select" id="status" name="status" x-model="form.status">
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                    </select>
+                </div>
+                <div style="grid-column:1/-1;">
+                    <button class="button" type="submit" style="width:100%;justify-content:center;">Register</button>
+                </div>
+            </form>
+
+            <p class="auth-links">Already have an account? <a href="{{ url_for('login') }}">Login here</a></p>
+        </div>
+    </div>
+
+    <script>
+        function registerPage() {
+            return {
+                errorMessage: '',
+                socket: null,
+                socketConnected: false,
+                form: { name: '', email: '', password: '', department_name: '', role: 'Employee', status: 'Active' },
+                init() {
+                    if (typeof io === 'undefined') return;
+                    this.socket = io();
+                    this.socket.on('connect', () => this.socketConnected = true);
+                    this.socket.on('disconnect', () => this.socketConnected = false);
+                    this.socket.on('connect_error', () => this.socketConnected = false);
+                    this.socket.on('register_response', (response) => {
+                        if (!response.success) {
+                            this.errorMessage = response.error || 'Registration failed.';
+                            return;
+                        }
+                        window.location.href = response.redirect;
+                    });
+                },
+                submitRegister() {
+                    this.errorMessage = '';
+                    if (!this.socket || !this.socketConnected) {
+                        return this.fallback();
+                    }
+                    const timeout = setTimeout(() => this.fallback(), 3000);
+                    this.socket.emit('register', { ...this.form });
+                    this.socket.once('register_response', () => clearTimeout(timeout));
+                },
+                fallback() {
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = '{{ url_for("register") }}';
+                    Object.entries(this.form).forEach(([name, value]) => {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = name;
+                        input.value = value || '';
+                        form.appendChild(input);
+                    });
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+            };
+        }
+    </script>
+</body>
+</html>
