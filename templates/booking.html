@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+{% block content %}
+<div x-data="bookingPage()" x-init="init()">
+
+  <div class="grid grid-cols-1 xl:grid-cols-3 gap-5">
+
+    <!-- Resource calendar -->
+    <div class="panel xl:col-span-2">
+      <div class="panel-header">
+        <h2>Resource Calendar</h2>
+      </div>
+
+      <div class="panel-row" style="margin-bottom:16px;">
+        <select class="select" style="max-width:260px;" x-model="calendarAssetId" @change="loadDayBookings()">
+          <option value="" disabled>Select a resource</option>
+          <template x-for="r in resources" :key="'cal-' + r.asset_id">
+            <option :value="r.asset_id" x-text="r.asset_tag + ' • ' + r.name"></option>
+          </template>
+        </select>
+        <input class="input" style="max-width:180px;" type="date" x-model="selectedDate" @change="loadDayBookings()">
+      </div>
+
+      <p class="empty-state" x-show="!calendarAssetId">Select a resource to see its bookings for the day.</p>
+      <p class="empty-state" x-show="calendarAssetId && resources.length === 0">No bookable resources yet.</p>
+
+      <template x-if="calendarAssetId">
+        <div>
+          <div class="relative border border-slate-200 rounded-lg bg-slate-50" style="height:560px;">
+            <template x-for="(hour, idx) in timelineHours" :key="'hr-' + hour">
+              <div class="absolute left-0 right-0 border-t border-slate-200"
+                   :style="`top:${(idx / timelineHours.length) * 100}%;`">
+                <span class="relative -top-2 bg-slate-50 text-xs text-slate-400 pl-2 pr-2" x-text="hour + ':00'"></span>
+              </div>
+            </template>
+            <template x-for="b in dayBookings" :key="'blk-' + b.booking_id">
+              <div class="absolute left-16 right-2 rounded-md px-2 py-1 text-xs font-medium text-white overflow-hidden shadow-sm"
+                   :class="blockColor(b.status)" :style="blockStyle(b)"
+                   :title="(b.employee_name || 'Booked') + ' • ' + formatRange(b)">
+                <span x-text="(b.employee_name || 'Booked') + ' · ' + formatRange(b)"></span>
+              </div>
+            </template>
+            <p class="empty-state" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;"
+               x-show="dayBookings.length === 0">No bookings for this resource on this day.</p>
+          </div>
+
+          <div class="table-wrapper" style="margin-top:16px;">
+            <table class="table">
+              <thead><tr><th>Time</th><th>Booked By</th><th>Status</th></tr></thead>
+              <tbody>
+                <template x-for="b in dayBookings" :key="'row-' + b.booking_id">
+                  <tr>
+                    <td x-text="formatRange(b)"></td>
+                    <td x-text="b.employee_name || '—'"></td>
+                    <td><span class="badge" :class="statusBadge(b.status)" x-text="b.status"></span></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+            <p class="empty-state" x-show="dayBookings.length === 0">Nothing booked yet — this resource is free all day.</p>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- Booking form -->
+    <div class="panel">
+      <div class="panel-header">
+        <h2 x-text="editingId ? 'Reschedule Booking' : 'New Booking'"></h2>
+      </div>
+      <form @submit.prevent="submitBooking" class="form-grid" style="grid-template-columns:1fr;">
+        <div>
+          <label class="form-label">Resource</label>
+          <select class="select" x-model="form.asset_id" :disabled="editingId" required>
+            <option value="" disabled>Select a resource</option>
+            <template x-for="r in resources" :key="'form-' + r.asset_id">
+              <option :value="r.asset_id" x-text="r.asset_tag + ' • ' + r.name"></option>
+            </template>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Start</label>
+          <input class="input" type="datetime-local" x-model="form.start_time" required>
+        </div>
+        <div>
+          <label class="form-label">End</label>
+          <input class="input" type="datetime-local" x-model="form.end_time" required>
+        </div>
+        <p style="padding:4px 0;color:#b91c1c;font-size:0.85rem;" x-show="formError" x-text="formError"></p>
+        <div class="panel-row">
+          <button class="button" type="submit" :disabled="submitting">
+            <span x-text="submitting ? 'Saving…' : (editingId ? 'Save Changes' : 'Book Resource')"></span>
+          </button>
+          <button class="button-secondary" type="button" @click="resetForm()" x-show="editingId">Cancel Edit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- My bookings -->
+  <div class="panel" style="margin-top:20px;">
+    <div class="panel-header">
+      <h2>My Bookings</h2>
+      <button class="button-secondary" @click="loadMyBookings()">Refresh</button>
+    </div>
+    <div class="table-wrapper">
+      <table class="table">
+        <thead><tr><th>Resource</th><th>Time</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>
+          <template x-for="b in myBookings" :key="'my-' + b.booking_id">
+            <tr>
+              <td>
+                <p class="font-medium text-slate-800" x-text="b.asset_name"></p>
+                <p class="text-xs text-slate-400" x-text="b.asset_tag"></p>
+              </td>
+              <td x-text="formatRange(b)"></td>
+              <td><span class="badge" :class="statusBadge(b.status)" x-text="b.status"></span></td>
+              <td>
+                <button class="button-secondary" @click="startReschedule(b)" x-show="b.status === 'Upcoming'">Reschedule</button>
+                <button class="button-danger" @click="cancelBooking(b.booking_id)" x-show="b.status === 'Upcoming' || b.status === 'Ongoing'">Cancel</button>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+      <p class="empty-state" x-show="myBookings.length === 0">You have no bookings yet.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function bookingPage() {
+  return {
+    resources: [],
+    myBookings: [],
+    dayBookings: [],
+    calendarAssetId: '',
+    selectedDate: new Date().toISOString().slice(0, 10),
+    form: { asset_id: '', start_time: '', end_time: '' },
+    editingId: null,
+    formError: '',
+    submitting: false,
+    timelineHours: Array.from({ length: 14 }, (_, i) => 7 + i), // 7:00 – 21:00 window
+    reminderTimer: null,
+    notifiedIds: [],
+
+    init() {
+      try {
+        this.notifiedIds = JSON.parse(localStorage.getItem('bookingRemindersNotified') || '[]');
+      } catch (e) {
+        this.notifiedIds = [];
+      }
+      this.loadResources();
+      this.loadMyBookings();
+      if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+      this.reminderTimer = setInterval(() => this.checkReminders(), 60000);
+    },
+
+    loadResources() {
+      fetch('/api/assets').then(res => res.json())
+        .then(data => {
+          this.resources = data.filter(a => a.is_bookable);
+          if (!this.calendarAssetId && this.resources.length) {
+            this.calendarAssetId = this.resources[0].asset_id;
+            this.loadDayBookings();
+          }
+        })
+        .catch(() => shellNotify('Failed to load resources.'));
+    },
+
+    loadDayBookings() {
+      if (!this.calendarAssetId) { this.dayBookings = []; return; }
+      fetch(`/api/bookings?asset_id=${this.calendarAssetId}&date=${this.selectedDate}`)
+        .then(res => res.json())
+        .then(data => { this.dayBookings = data.filter(b => b.status !== 'Cancelled'); })
+        .catch(() => shellNotify('Failed to load bookings for this resource.'));
+    },
+
+    loadMyBookings() {
+      fetch('/api/bookings?mine=1').then(res => res.json())
+        .then(data => { this.myBookings = data; this.checkReminders(); })
+        .catch(() => shellNotify('Failed to load your bookings.'));
+    },
+
+    resetForm() {
+      this.editingId = null;
+      this.form = { asset_id: this.calendarAssetId || '', start_time: '', end_time: '' };
+      this.formError = '';
+    },
+
+    startReschedule(b) {
+      this.editingId = b.booking_id;
+      this.form = {
+        asset_id: b.asset_id,
+        start_time: b.start_time ? b.start_time.slice(0, 16) : '',
+        end_time: b.end_time ? b.end_time.slice(0, 16) : ''
+      };
+      this.formError = '';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+
+    submitBooking() {
+      this.formError = '';
+      if (!this.form.asset_id || !this.form.start_time || !this.form.end_time) {
+        this.formError = 'Resource, start and end time are required.';
+        return;
+      }
+      if (new Date(this.form.end_time) <= new Date(this.form.start_time)) {
+        this.formError = 'End time must be after start time.';
+        return;
+      }
+
+      this.submitting = true;
+      const payload = { asset_id: this.form.asset_id, start_time: this.form.start_time, end_time: this.form.end_time };
+      const url = this.editingId ? `/api/bookings/${this.editingId}` : '/api/bookings';
+      const method = this.editingId ? 'PUT' : 'POST';
+
+      fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        .then(res => res.ok ? res.json() : res.json().then(err => Promise.reject(err)))
+        .then(() => {
+          this.submitting = false;
+          shellNotify(this.editingId ? 'Booking rescheduled.' : 'Resource booked.');
+          this.resetForm();
+          this.loadMyBookings();
+          this.loadDayBookings();
+        })
+        .catch(err => {
+          this.submitting = false;
+          this.formError = err.error || 'Failed to save booking.';
+        });
+    },
+
+    cancelBooking(id) {
+      if (!confirm('Cancel this booking?')) return;
+      fetch(`/api/bookings/${id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'Cancelled' })
+      })
+        .then(res => res.ok ? res.json() : Promise.reject())
+        .then(() => { this.loadMyBookings(); this.loadDayBookings(); shellNotify('Booking cancelled.'); })
+        .catch(() => shellNotify('Failed to cancel booking.'));
+    },
+
+    formatRange(b) {
+      const s = new Date(b.start_time), e = new Date(b.end_time);
+      const dateOpts = { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+      return `${s.toLocaleString([], dateOpts)} – ${e.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    },
+
+    statusBadge(status) {
+      const map = { Upcoming: 'badge-pending', Ongoing: 'badge-available', Completed: 'badge-inactive', Cancelled: 'badge-lost' };
+      return map[status] || 'badge-pending';
+    },
+
+    blockColor(status) {
+      const map = { Upcoming: 'bg-amber-500', Ongoing: 'bg-emerald-500', Completed: 'bg-slate-400', Cancelled: 'bg-rose-500' };
+      return map[status] || 'bg-amber-500';
+    },
+
+    blockStyle(b) {
+      const dayStart = 7 * 60, dayEnd = 21 * 60; // minutes, matches timelineHours window
+      const s = new Date(b.start_time), e = new Date(b.end_time);
+      let startMin = s.getHours() * 60 + s.getMinutes();
+      let endMin = e.getHours() * 60 + e.getMinutes();
+      startMin = Math.max(startMin, dayStart);
+      endMin = Math.min(Math.max(endMin, startMin + 15), dayEnd);
+      const total = dayEnd - dayStart;
+      const top = ((startMin - dayStart) / total) * 100;
+      const height = Math.max(((endMin - startMin) / total) * 100, 3);
+      return `top:${top}%;height:${height}%;`;
+    },
+
+    checkReminders() {
+      const now = new Date();
+      this.myBookings.forEach(b => {
+        if (b.status !== 'Upcoming') return;
+        const start = new Date(b.start_time);
+        const minutesUntil = (start - now) / 60000;
+        if (minutesUntil > 0 && minutesUntil <= 15 && !this.notifiedIds.includes(b.booking_id)) {
+          const msg = `Reminder: "${b.asset_name}" starts at ${start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+          shellNotify(msg);
+          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+            new Notification('Upcoming booking', { body: msg });
+          }
+          this.notifiedIds.push(b.booking_id);
+          try { localStorage.setItem('bookingRemindersNotified', JSON.stringify(this.notifiedIds)); } catch (e) {}
+        }
+      });
+    }
+  };
+}
+</script>
+{% endblock %}

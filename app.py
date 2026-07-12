@@ -94,29 +94,41 @@ def nav_item(key, name, endpoint=None, soon=False):
 
 
 def get_nav_sections(role):
+    """Every role gets a link to every page it can actually reach.
+
+    All page routes only require login (`@login_required`) except /admin,
+    which additionally checks `role == 'Admin'` server-side and bounces
+    anyone else back to the dashboard. So Admin Console is only ever shown
+    to Admins; Dashboard, All Assets, Analytics, and Report Issue are real,
+    working pages for every role and are always shown. Features that don't
+    have a route yet stay labeled 'Soon' rather than being hidden.
+    """
     dashboard_item = nav_item('dashboard', 'Dashboard', 'dashboard')
+    all_assets_item = nav_item('all_assets', 'All Assets', 'all_assets')
+    analytics_item = nav_item('analytics', 'Analytics', 'analytics')
+    reports_item = nav_item('reports', 'Report Issue', 'reports')
+    booking_item = nav_item('booking', 'Book Resource', 'booking')
 
     if role == 'Admin':
         return [
             {'label': 'Overview', 'links': [dashboard_item]},
             {'label': 'Administration', 'links': [
                 nav_item('admin', 'Admin Console', 'admin'),
-                nav_item('analytics', 'Analytics', 'analytics'),
+                analytics_item,
             ]},
-            {'label': 'Assets', 'links': [
-                nav_item('all_assets', 'All Assets', 'all_assets'),
-                nav_item('reports', 'Report Issue', 'reports'),
-            ]},
+            {'label': 'Assets', 'links': [all_assets_item, booking_item, reports_item]},
         ]
     if role == 'Asset Manager':
         return [
             {'label': 'Overview', 'links': [dashboard_item]},
             {'label': 'Asset Operations', 'links': [
-                nav_item('all_assets', 'All Assets', 'all_assets'),
+                all_assets_item,
+                booking_item,
                 nav_item('register_allocate', 'Register / Allocate Assets', soon=True),
                 nav_item('approvals', 'Approval Workflows', soon=True),
             ]},
-            {'label': 'Support', 'links': [nav_item('reports', 'Report Issue', 'reports')]},
+            {'label': 'Insights', 'links': [analytics_item]},
+            {'label': 'Support', 'links': [reports_item]},
         ]
     if role == 'Department Head':
         return [
@@ -125,20 +137,17 @@ def get_nav_sections(role):
                 nav_item('dept_assets', 'Department Assets', soon=True),
                 nav_item('dept_approvals', 'Department Approvals', soon=True),
             ]},
-            {'label': 'Insights', 'links': [
-                nav_item('all_assets', 'All Assets', 'all_assets'),
-                nav_item('analytics', 'Analytics', 'analytics'),
-                nav_item('reports', 'Report Issue', 'reports'),
-            ]},
+            {'label': 'Insights', 'links': [all_assets_item, booking_item, analytics_item, reports_item]},
         ]
     # Employee (default)
     return [
         {'label': 'My Workspace', 'links': [
             dashboard_item,
             nav_item('my_assets', 'My Assets', soon=True),
-            nav_item('booking', 'Book Resource', soon=True),
+            booking_item,
         ]},
-        {'label': 'Support', 'links': [nav_item('reports', 'Report Issue', 'reports')]},
+        {'label': 'Insights', 'links': [all_assets_item, analytics_item]},
+        {'label': 'Support', 'links': [reports_item]},
     ]
 
 
@@ -215,6 +224,34 @@ def asset_to_dict(asset):
         'photo_url': asset.photo_url,
         'is_bookable': bool(asset.is_bookable),
         'status': asset.status
+    }
+
+
+def booking_to_dict(booking):
+    """Serializes a Booking. Status is derived live from start/end time so
+    Upcoming/Ongoing/Completed always reflect the current moment; 'Cancelled'
+    is the only status we actually persist and it always wins."""
+    asset = booking.asset
+    employee = booking.employee
+    now = datetime.utcnow()
+    status = booking.status or 'Upcoming'
+    if status != 'Cancelled':
+        if booking.start_time and now < booking.start_time:
+            status = 'Upcoming'
+        elif booking.start_time and booking.end_time and booking.start_time <= now <= booking.end_time:
+            status = 'Ongoing'
+        else:
+            status = 'Completed'
+    return {
+        'booking_id': booking.booking_id,
+        'asset_id': booking.asset_id,
+        'asset_name': asset.name if asset else None,
+        'asset_tag': asset.asset_tag if asset else None,
+        'employee_id': booking.employee_id,
+        'employee_name': employee.name if employee else None,
+        'start_time': booking.start_time.isoformat() if booking.start_time else None,
+        'end_time': booking.end_time.isoformat() if booking.end_time else None,
+        'status': status,
     }
 
 
@@ -346,6 +383,12 @@ def analytics():
 @login_required
 def reports():
     return render_app_page('reports.html', 'reports', 'Report Issue', 'Report an issue related to an asset.')
+
+
+@app.route('/booking', methods=['GET'])
+@login_required
+def booking():
+    return render_app_page('booking.html', 'booking', 'Book Resource', 'Reserve shared resources with real-time overlap checks.')
 
 
 # ---------------------------------------------------------------------------
@@ -606,6 +649,171 @@ def api_create_maintenance():
 
 
 # ---------------------------------------------------------------------------
+# Booking API (Resource Booking Screen)
+# ---------------------------------------------------------------------------
+
+def _parse_datetime(raw):
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(raw)
+    except (ValueError, TypeError):
+        return None
+
+
+def _booking_conflict(asset_id, start_time, end_time, exclude_booking_id=None):
+    """Two bookings overlap only if one starts before the other ends on both
+    sides — so a slot that starts exactly when another ends is fine."""
+    query = Booking.query.filter(
+        Booking.asset_id == asset_id,
+        Booking.status != 'Cancelled',
+        Booking.start_time < end_time,
+        Booking.end_time > start_time
+    )
+    if exclude_booking_id:
+        query = query.filter(Booking.booking_id != exclude_booking_id)
+    return query.first()
+
+
+@app.route('/api/bookings', methods=['GET'])
+@login_required
+def api_get_bookings():
+    current = current_user()
+    query = Booking.query
+    asset_id = request.args.get('asset_id')
+    date_str = request.args.get('date')
+    mine = request.args.get('mine')
+
+    if asset_id:
+        # Resource calendar view: everyone can see who has a resource booked
+        # (and when) so they can pick a free slot, regardless of role.
+        try:
+            query = query.filter(Booking.asset_id == int(asset_id))
+        except ValueError:
+            return jsonify({'error': 'Invalid asset_id.'}), 400
+        if date_str:
+            try:
+                day_start = datetime.strptime(date_str, '%Y-%m-%d')
+            except ValueError:
+                return jsonify({'error': 'Invalid date, expected YYYY-MM-DD.'}), 400
+            day_end = day_start + timedelta(days=1)
+            query = query.filter(Booking.start_time < day_end, Booking.end_time > day_start)
+    elif mine or (current.role or '') not in ('Admin', 'Asset Manager'):
+        query = query.filter(Booking.employee_id == current.employee_id)
+    # else: Admin / Asset Manager with no filters see every booking org-wide.
+
+    bookings = query.order_by(Booking.start_time).all()
+    return jsonify([booking_to_dict(b) for b in bookings])
+
+
+@app.route('/api/bookings', methods=['POST'])
+@login_required
+def api_create_booking():
+    data = request.get_json() or {}
+    asset_id = data.get('asset_id')
+    start_time = _parse_datetime(data.get('start_time'))
+    end_time = _parse_datetime(data.get('end_time'))
+
+    if not asset_id or not start_time or not end_time:
+        return jsonify({'error': 'Resource, start time and end time are required.'}), 400
+
+    asset = Asset.query.get(asset_id)
+    if not asset:
+        return jsonify({'error': 'Selected resource was not found.'}), 400
+    if not asset.is_bookable:
+        return jsonify({'error': 'This asset is not bookable.'}), 400
+    if end_time <= start_time:
+        return jsonify({'error': 'End time must be after start time.'}), 400
+    if end_time <= datetime.utcnow():
+        return jsonify({'error': 'Cannot book a slot that has already ended.'}), 400
+
+    conflict = _booking_conflict(asset.asset_id, start_time, end_time)
+    if conflict:
+        return jsonify({
+            'error': f'That slot overlaps an existing booking '
+                     f'({conflict.start_time.strftime("%b %d, %H:%M")}\u2013{conflict.end_time.strftime("%H:%M")}).'
+        }), 409
+
+    current = current_user()
+    employee_id = current.employee_id
+    requested_employee_id = data.get('employee_id')
+    if requested_employee_id and (current.role or '') in ('Admin', 'Asset Manager'):
+        employee_id = requested_employee_id
+
+    booking = Booking(
+        asset_id=asset.asset_id,
+        employee_id=employee_id,
+        start_time=start_time,
+        end_time=end_time,
+        status='Upcoming'
+    )
+    db.session.add(booking)
+    db.session.add(ActivityLog(
+        user_id=current.employee_id,
+        action_taken='create_booking',
+        timestamp=datetime.utcnow(),
+        details=f'Booked {asset.name} ({asset.asset_tag}) from {start_time} to {end_time}'
+    ))
+    db.session.commit()
+    return jsonify(booking_to_dict(booking)), 201
+
+
+@app.route('/api/bookings/<int:booking_id>', methods=['PUT'])
+@login_required
+def api_update_booking(booking_id):
+    booking = Booking.query.get_or_404(booking_id)
+    current = current_user()
+    is_manager = (current.role or '') in ('Admin', 'Asset Manager')
+    if booking.employee_id != current.employee_id and not is_manager:
+        return jsonify({'error': 'You do not have permission to modify this booking.'}), 403
+
+    data = request.get_json() or {}
+
+    # Cancel
+    if data.get('status') == 'Cancelled':
+        booking.status = 'Cancelled'
+        db.session.commit()
+        return jsonify(booking_to_dict(booking))
+
+    # Reschedule
+    if data.get('start_time') or data.get('end_time'):
+        start_time = _parse_datetime(data.get('start_time')) or booking.start_time
+        end_time = _parse_datetime(data.get('end_time')) or booking.end_time
+
+        if end_time <= start_time:
+            return jsonify({'error': 'End time must be after start time.'}), 400
+        if end_time <= datetime.utcnow():
+            return jsonify({'error': 'Cannot reschedule to a slot that has already ended.'}), 400
+
+        conflict = _booking_conflict(booking.asset_id, start_time, end_time, exclude_booking_id=booking.booking_id)
+        if conflict:
+            return jsonify({
+                'error': f'That slot overlaps an existing booking '
+                         f'({conflict.start_time.strftime("%b %d, %H:%M")}\u2013{conflict.end_time.strftime("%H:%M")}).'
+            }), 409
+
+        booking.start_time = start_time
+        booking.end_time = end_time
+        booking.status = 'Upcoming'
+
+    db.session.commit()
+    return jsonify(booking_to_dict(booking))
+
+
+@app.route('/api/bookings/<int:booking_id>', methods=['DELETE'])
+@login_required
+def api_delete_booking(booking_id):
+    booking = Booking.query.get_or_404(booking_id)
+    current = current_user()
+    is_manager = (current.role or '') in ('Admin', 'Asset Manager')
+    if booking.employee_id != current.employee_id and not is_manager:
+        return jsonify({'error': 'You do not have permission to delete this booking.'}), 403
+    db.session.delete(booking)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+# ---------------------------------------------------------------------------
 # Dashboard API
 # ---------------------------------------------------------------------------
 
@@ -620,7 +828,7 @@ def api_dashboard():
         'available': Asset.query.filter_by(status='Available').count(),
         'allocated': Asset.query.filter_by(status='Allocated').count(),
         'maintenance_pending': MaintenanceRequest.query.filter_by(status='Pending').count(),
-        'active_bookings': Booking.query.filter(Booking.status.in_(['Upcoming', 'Active'])).count(),
+        'active_bookings': Booking.query.filter(Booking.status != 'Cancelled', Booking.end_time >= now).count(),
         'active_allocations': Allocation.query.count(),
     }
 
