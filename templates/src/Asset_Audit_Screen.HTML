@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AssetFlow — Audit Cycle Management</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root{
+    --slate-950:#0b1120; --slate-900:#0f172a; --slate-800:#1e293b; --slate-700:#334155;
+    --slate-500:#64748b; --slate-300:#cbd5e1; --slate-200:#e2e8f0; --slate-100:#f1f5f9; --slate-50:#f8fafc;
+    --indigo-600:#4f46e5; --indigo-500:#6366f1; --indigo-50:#eef2ff;
+    --emerald-600:#059669; --emerald-50:#ecfdf5;
+    --amber-600:#d97706; --amber-50:#fffbeb;
+    --red-600:#dc2626; --red-50:#fef2f2;
+  }
+  *{font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;}
+  .font-data{font-family: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums;}
+
+  body{background:var(--slate-50); color:var(--slate-900);}
+
+  /* Stepper rail */
+  .rail{position:relative;}
+  .rail::before{
+    content:"";position:absolute; left:15px; top:28px; bottom:28px; width:2px;
+    background: var(--slate-200); z-index:0;
+  }
+  .rail-node{
+    width:32px;height:32px;border-radius:9999px;display:flex;align-items:center;justify-content:center;
+    font-size:13px; font-weight:600; position:relative; z-index:1; flex-shrink:0;
+    border:2px solid var(--slate-200); background:white; color:var(--slate-500);
+    transition: all .2s ease;
+  }
+  .rail-node.done{ background:var(--indigo-600); border-color:var(--indigo-600); color:white; }
+  .rail-node.active{ border-color:var(--indigo-600); color:var(--indigo-600); box-shadow:0 0 0 4px var(--indigo-50); }
+  .rail-node.locked{ background:var(--slate-100); border-color:var(--slate-200); color:var(--slate-300); }
+  .rail-step{cursor:pointer;}
+  .rail-step.disabled{cursor:not-allowed; opacity:.55;}
+
+  /* Status pills */
+  .pill{display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600; padding:3px 10px; border-radius:9999px; letter-spacing:.01em;}
+  .pill-dot{width:6px;height:6px;border-radius:9999px;}
+  .pill-draft{background:var(--slate-100); color:var(--slate-700);}
+  .pill-draft .pill-dot{background:var(--slate-500);}
+  .pill-progress{background:var(--indigo-50); color:var(--indigo-600);}
+  .pill-progress .pill-dot{background:var(--indigo-600);}
+  .pill-closed{background:var(--slate-800); color:white;}
+  .pill-closed .pill-dot{background:#94a3b8;}
+  .pill-verified{background:var(--emerald-50); color:var(--emerald-600);}
+  .pill-verified .pill-dot{background:var(--emerald-600);}
+  .pill-missing{background:var(--amber-50); color:var(--amber-600);}
+  .pill-missing .pill-dot{background:var(--amber-600);}
+  .pill-damaged{background:var(--red-50); color:var(--red-600);}
+  .pill-damaged .pill-dot{background:var(--red-600);}
+  .pill-pending{background:var(--slate-100); color:var(--slate-500);}
+  .pill-pending .pill-dot{background:var(--slate-300);}
+  .pill-lost{background:#1e293b; color:#f8fafc;}
+  .pill-lost .pill-dot{background:#f87171;}
+
+  /* Toggle buttons */
+  .toggle-btn{
+    font-size:12px; font-weight:600; padding:6px 12px; border-radius:8px; border:1px solid var(--slate-200);
+    background:white; color:var(--slate-500); transition:all .15s ease; cursor:pointer;
+  }
+  .toggle-btn:hover:not(:disabled){ border-color:var(--slate-300); }
+  .toggle-btn:disabled{ cursor:not-allowed; opacity:.45; }
+  .toggle-btn.sel-verified{ background:var(--emerald-600); border-color:var(--emerald-600); color:white; }
+  .toggle-btn.sel-missing{ background:var(--amber-600); border-color:var(--amber-600); color:white; }
+  .toggle-btn.sel-damaged{ background:var(--red-600); border-color:var(--red-600); color:white; }
+
+  .card{ background:white; border:1px solid var(--slate-200); border-radius:14px; }
+  .row-flag{ border-left:3px solid transparent; }
+  .row-flag.missing{ border-left-color: var(--amber-600); background: #fffdf7; }
+  .row-flag.damaged{ border-left-color: var(--red-600); background: #fffafa; }
+
+  ::-webkit-scrollbar{height:8px; width:8px;}
+  ::-webkit-scrollbar-thumb{background:var(--slate-200); border-radius:8px;}
+
+  .fade-in{ animation: fadeIn .25s ease; }
+  @keyframes fadeIn{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);} }
+
+  .modal-backdrop{ background: rgba(15,23,42,.5); backdrop-filter: blur(2px); }
+
+  .btn-primary{ background:var(--indigo-600); color:white; font-weight:600; }
+  .btn-primary:hover{ background:var(--indigo-500); }
+  .btn-primary:disabled{ background:var(--slate-300); cursor:not-allowed; }
+
+  .btn-danger-outline{ border:1px solid var(--red-600); color:var(--red-600); font-weight:600; background:white; }
+  .btn-danger-outline:hover{ background:var(--red-50); }
+
+  .input-field{
+    width:100%; border:1px solid var(--slate-200); border-radius:8px; padding:9px 12px; font-size:14px;
+    background:white; color:var(--slate-900); transition:border-color .15s ease;
+  }
+  .input-field:focus{ outline:none; border-color:var(--indigo-500); box-shadow:0 0 0 3px var(--indigo-50); }
+
+  .tab-btn{ font-size:13px; font-weight:600; padding:9px 16px; border-radius:8px; color:var(--slate-500); cursor:pointer; }
+  .tab-btn.active{ background:var(--slate-900); color:white; }
+  .tab-btn:not(.active):hover{ background:var(--slate-100); }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- ============ HEADER ============ -->
+<header class="border-b" style="border-color:var(--slate-200); background:white;">
+  <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg flex items-center justify-center text-white font-bold text-sm" style="background:var(--slate-900);">AF</div>
+      <div>
+        <div class="text-[15px] font-bold leading-tight">AssetFlow <span class="font-normal text-slate-400">/ Audit Cycle Management</span></div>
+        <div class="text-xs text-slate-400 font-data">ENTERPRISE ASSET CONTROL</div>
+      </div>
+    </div>
+    <div id="header-status"></div>
+  </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-6 py-8">
+
+  <!-- ============ PHASE 1: CREATION (shown when no active cycle) ============ -->
+  <section id="view-create" class="fade-in"></section>
+
+  <!-- ============ ACTIVE CYCLE WORKSPACE ============ -->
+  <section id="view-workspace" class="hidden fade-in grid grid-cols-12 gap-6"></section>
+
+  <!-- ============ HISTORY ============ -->
+  <section class="mt-10">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-sm font-bold text-slate-700 tracking-wide">CYCLE HISTORY</h2>
+      <span class="text-xs text-slate-400 font-data" id="history-count"></span>
+    </div>
+    <div id="view-history" class="card overflow-hidden"></div>
+  </section>
+
+</main>
+
+<!-- ============ CLOSE CONFIRM MODAL ============ -->
+<div id="close-modal" class="hidden fixed inset-0 modal-backdrop z-50 flex items-center justify-center px-4">
+  <div class="card w-full max-w-md p-6">
+    <div class="flex items-start gap-3 mb-4">
+      <div class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style="background:var(--red-50);">
+        <svg width="20" height="20" fill="none" stroke="var(--red-600)" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
+      </div>
+      <div>
+        <h3 class="font-bold text-[15px]">Close this audit cycle?</h3>
+        <p class="text-sm text-slate-500 mt-1">This locks all verification findings. Assets marked <b>Missing</b> will have their master status set to <b>Lost</b>. This cannot be undone.</p>
+      </div>
+    </div>
+    <div id="close-modal-summary" class="text-xs bg-slate-50 rounded-lg p-3 mb-5 font-data"></div>
+    <div class="flex justify-end gap-2">
+      <button onclick="closeModalHide()" class="px-4 py-2 rounded-lg text-sm font-semibold border" style="border-color:var(--slate-200);">Cancel</button>
+      <button onclick="confirmCloseCycle()" class="px-4 py-2 rounded-lg text-sm btn-danger-outline">Close cycle</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ HISTORY DETAIL MODAL ============ -->
+<div id="history-modal" class="hidden fixed inset-0 modal-backdrop z-50 flex items-center justify-center px-4">
+  <div class="card w-full max-w-2xl p-6 max-h-[80vh] overflow-y-auto">
+    <div id="history-modal-content"></div>
+    <div class="flex justify-end mt-4">
+      <button onclick="historyModalHide()" class="px-4 py-2 rounded-lg text-sm font-semibold border" style="border-color:var(--slate-200);">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   DATA LAYER
+   Isolated so this can be swapped for real API calls later:
+   every read goes through DataStore.get*(), every write through
+   DataStore.do*(). Nothing else in the app touches the arrays directly.
+   ===================================================================== */
+const DataStore = (function(){
+  let masterAssets = [
+    {id:'AST-1001', name:'Dell Latitude 5440 Laptop',   category:'IT Equipment', department:'Engineering', status:'Active'},
+    {id:'AST-1002', name:'HP LaserJet Pro Printer',      category:'IT Equipment', department:'Operations',  status:'Active'},
+    {id:'AST-1003', name:'Herman Miller Aeron Chair',    category:'Furniture',    department:'Engineering', status:'Active'},
+    {id:'AST-1004', name:'Dell UltraSharp 27" Monitor',  category:'IT Equipment', department:'Engineering', status:'Active'},
+    {id:'AST-1005', name:'Cisco Catalyst Switch',        category:'Networking',   department:'IT Infra',    status:'Active'},
+    {id:'AST-1006', name:'Epson Projector EB-2250U',     category:'AV Equipment', department:'Operations',  status:'Active'},
+    {id:'AST-1007', name:'Steelcase Conference Table',   category:'Furniture',    department:'Operations',  status:'Active'},
+    {id:'AST-1008', name:'MacBook Pro 16" M3',           category:'IT Equipment', department:'Design',      status:'Active'},
+    {id:'AST-1009', name:'APC Smart-UPS 1500VA',         category:'IT Equipment', department:'IT Infra',    status:'Active'},
+    {id:'AST-1010', name:'Fireproof Filing Cabinet',     category:'Furniture',    department:'Finance',     status:'Active'},
+    {id:'AST-1011', name:'Dell PowerEdge R750 Server',   category:'IT Equipment', department:'IT Infra',    status:'Active'},
+    {id:'AST-1012', name:'Logitech MeetUp Conf. Camera', category:'AV Equipment', department:'Operations',  status:'Active'},
+    {id:'AST-1013', name:'Standing Desk (Electric)',     category:'Furniture',    department:'Design',      status:'Active'},
+    {id:'AST-1014', name:'iPad Pro 12.9" (Kiosk)',       category:'IT Equipment', department:'Operations',  status:'Active'},
+  ];
+
+  let cycles = []; // closed + in-progress cycles
+  let currentCycleId = null;
+  let seq = 1;
+
+  function getAssets(){ return masterAssets; }
+  function getCycles(){ return cycles; }
+  function getCurrentCycle(){ return cycles.find(c => c.id === currentCycleId) || null; }
+
+  function doCreateCycle(form){
+    const cycle = {
+      id: 'CYC-' + String(seq++).padStart(3,'0'),
+      name: form.name,
+      department: form.department,
+      auditor: form.auditor,
+      startDate: form.startDate,
+      endDate: form.endDate,
+      status: 'In Progress',
+      createdAt: new Date().toISOString(),
+      // snapshot of assets in scope at time of creation
+      findings: masterAssets
+        .filter(a => form.department === 'All Departments' || a.department === form.department)
+        .map(a => ({ assetId:a.id, status:'Pending' }))
+    };
+    cycles.push(cycle);
+    currentCycleId = cycle.id;
+    return cycle;
+  }
+
+  function doSetFinding(assetId, status){
+    const cycle = getCurrentCycle();
+    if(!cycle || cycle.status === 'Closed') return;
+    const f = cycle.findings.find(f => f.assetId === assetId);
+    if(f) f.status = status;
+  }
+
+  function doCloseCycle(){
+    const cycle = getCurrentCycle();
+    if(!cycle || cycle.status === 'Closed') return null;
+    cycle.findings.forEach(f => {
+      const asset = masterAssets.find(a => a.id === f.assetId);
+      if(!asset) return;
+      if(f.status === 'Missing') asset.status = 'Lost';
+      else if(f.status === 'Damaged') asset.status = 'Damaged';
+      else if(f.status === 'Verified') asset.status = 'Active';
+    });
+    cycle.status = 'Closed';
+    cycle.closedAt = new Date().toISOString();
+    currentCycleId = null;
+    return cycle;
+  }
+
+  function doStartNewCycle(){
+    currentCycleId = null;
+  }
+
+  return { getAssets, getCycles, getCurrentCycle, doCreateCycle, doSetFinding, doCloseCycle, doStartNewCycle };
+})();
+
+/* =====================================================================
+   UI STATE
+   ===================================================================== */
+let activeTab = 'verification'; // 'verification' | 'discrepancies'
+
+/* =====================================================================
+   RENDER
+   ===================================================================== */
+function render(){
+  const cycle = DataStore.getCurrentCycle();
+  renderHeaderStatus(cycle);
+  document.getElementById('view-create').classList.toggle('hidden', !!cycle);
+  document.getElementById('view-workspace').classList.toggle('hidden', !cycle);
+  if(cycle){ renderWorkspace(cycle); } else { renderCreateForm(); }
+  renderHistory();
+}
+
+function pill(status){
+  const map = {
+    'Draft':['pill-draft','Draft'], 'In Progress':['pill-progress','In Progress'], 'Closed':['pill-closed','Closed'],
+    'Verified':['pill-verified','Verified'], 'Missing':['pill-missing','Missing'], 'Damaged':['pill-damaged','Damaged'],
+    'Pending':['pill-pending','Pending'], 'Active':['pill-verified','Active'], 'Lost':['pill-lost','Lost']
+  };
+  const [cls,label] = map[status] || ['pill-pending', status];
+  return `<span class="pill ${cls}"><span class="pill-dot"></span>${label}</span>`;
+}
+
+function renderHeaderStatus(cycle){
+  const el = document.getElementById('header-status');
+  if(!cycle){ el.innerHTML = `<span class="text-xs text-slate-400">No active cycle</span>`; return; }
+  el.innerHTML = `
+    <div class="flex items-center gap-3">
+      <div class="text-right">
+        <div class="text-xs text-slate-400 font-data">${cycle.id}</div>
+        <div class="text-sm font-semibold">${cycle.name}</div>
+      </div>
+      ${pill(cycle.status)}
+    </div>`;
+}
+
+/* ---------- Phase 1: Creation ---------- */
+function renderCreateForm(){
+  const departments = [...new Set(DataStore.getAssets().map(a=>a.department))];
+  document.getElementById('view-create').innerHTML = `
+    <div class="max-w-2xl mx-auto">
+      <div class="text-center mb-8">
+        <div class="inline-flex items-center gap-2 text-xs font-semibold px-3 py-1 rounded-full mb-3" style="background:var(--indigo-50); color:var(--indigo-600);">
+          <span class="pill-dot" style="width:6px;height:6px;border-radius:9999px;background:var(--indigo-600);"></span>
+          NEW AUDIT CYCLE
+        </div>
+        <h1 class="text-2xl font-bold text-slate-900">Set up an audit cycle</h1>
+        <p class="text-sm text-slate-500 mt-1">Define scope and assign an auditor before verification begins.</p>
+      </div>
+      <form id="create-form" class="card p-6 space-y-5" onsubmit="return handleCreateCycle(event)">
+        <div>
+          <label class="text-xs font-semibold text-slate-600">Cycle name</label>
+          <input required name="name" class="input-field mt-1" placeholder="e.g. Q3 2026 Fixed Asset Audit">
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="text-xs font-semibold text-slate-600">Scope / Department</label>
+            <select required name="department" class="input-field mt-1">
+              <option value="All Departments">All Departments</option>
+              ${departments.map(d=>`<option value="${d}">${d}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-slate-600">Assigned auditor</label>
+            <input required name="auditor" class="input-field mt-1" placeholder="e.g. Priya Nair">
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="text-xs font-semibold text-slate-600">Start date</label>
+            <input required type="date" name="startDate" class="input-field mt-1">
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-slate-600">End date</label>
+            <input required type="date" name="endDate" class="input-field mt-1">
+          </div>
+        </div>
+        <button type="submit" class="w-full btn-primary rounded-lg py-2.5 text-sm mt-2">Create cycle &amp; begin verification</button>
+      </form>
+    </div>`;
+}
+
+function handleCreateCycle(e){
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const form = Object.fromEntries(fd.entries());
+  DataStore.doCreateCycle(form);
+  activeTab = 'verification';
+  render();
+  return false;
+}
+
+/* ---------- Workspace: stepper + summary + tabs ---------- */
+function renderWorkspace(cycle){
+  const closed = cycle.status === 'Closed';
+  const counts = tallyFindings(cycle);
+
+  document.getElementById('view-workspace').innerHTML = `
+    <!-- Stepper rail -->
+    <div class="col-span-3">
+      <div class="card p-5 rail sticky top-6">
+        ${stepperNode(1,'done','Setup', 'Cycle scope & auditor defined')}
+        ${stepperNode(2, closed? 'done' : 'active', 'Verification', 'Mark each asset', ()=>setTab('verification'), activeTab==='verification' && !closed)}
+        ${stepperNode(3, counts.flagged>0 || closed ? (activeTab==='discrepancies'?'active':'done') : 'locked', 'Discrepancies', counts.flagged + ' flagged item(s)', ()=>setTab('discrepancies'))}
+        ${stepperNode(4, closed?'done':'locked', 'Closure', closed? 'Cycle locked' : 'Awaiting close action')}
+      </div>
+    </div>
+
+    <!-- Main content -->
+    <div class="col-span-9 space-y-5">
+      <!-- Summary card -->
+      <div class="card p-5">
+        <div class="flex items-start justify-between flex-wrap gap-4">
+          <div>
+            <div class="text-xs text-slate-400 font-data mb-1">${cycle.id}</div>
+            <h2 class="text-lg font-bold">${cycle.name}</h2>
+            <div class="flex flex-wrap gap-x-5 gap-y-1 mt-2 text-xs text-slate-500">
+              <span><b class="text-slate-700">Scope:</b> ${cycle.department}</span>
+              <span><b class="text-slate-700">Auditor:</b> ${cycle.auditor}</span>
+              <span><b class="text-slate-700">Window:</b> ${cycle.startDate} → ${cycle.endDate}</span>
+            </div>
+          </div>
+          <div class="flex flex-col items-end gap-2">
+            ${pill(cycle.status)}
+            ${closed
+              ? `<span class="text-xs text-slate-400">Closed ${new Date(cycle.closedAt).toLocaleString()}</span>`
+              : `<button onclick="closeModalShow()" class="text-sm font-semibold px-4 py-2 rounded-lg btn-danger-outline">Close cycle</button>`}
+          </div>
+        </div>
+
+        <!-- Counters -->
+        <div class="grid grid-cols-4 gap-3 mt-5">
+          ${counterCard('Verified', counts.Verified, 'var(--emerald-600)', 'var(--emerald-50)')}
+          ${counterCard('Missing', counts.Missing, 'var(--amber-600)', 'var(--amber-50)')}
+          ${counterCard('Damaged', counts.Damaged, 'var(--red-600)', 'var(--red-50)')}
+          ${counterCard('Pending', counts.Pending, 'var(--slate-500)', 'var(--slate-100)')}
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="flex gap-2">
+        <div class="tab-btn ${activeTab==='verification'?'active':''}" onclick="setTab('verification')">Verification (${cycle.findings.length})</div>
+        <div class="tab-btn ${activeTab==='discrepancies'?'active':''}" onclick="setTab('discrepancies')">Discrepancy Report (${counts.flagged})</div>
+      </div>
+
+      <div id="tab-content"></div>
+    </div>
+  `;
+  renderTabContent(cycle, closed);
+}
+
+function counterCard(label, value, color, bg){
+  return `<div class="rounded-lg p-3" style="background:${bg};">
+    <div class="text-2xl font-bold font-data" style="color:${color};">${value}</div>
+    <div class="text-xs font-semibold" style="color:${color};">${label}</div>
+  </div>`;
+}
+
+function stepperNode(num, state, title, subtitle, onclick, forceActive){
+  const cls = forceActive ? 'active' : state;
+  const clickable = typeof onclick === 'function';
+  return `
+  <div class="flex gap-3 pb-7 last:pb-0 rail-step ${clickable?'':'disabled'}" ${clickable?`onclick="(${onclick.toString()})()"`:''}>
+    <div class="rail-node ${cls}">${cls==='done' ? '✓' : num}</div>
+    <div class="pt-1">
+      <div class="text-sm font-semibold ${cls==='locked' ? 'text-slate-300' : 'text-slate-800'}">${title}</div>
+      <div class="text-xs ${cls==='locked' ? 'text-slate-300' : 'text-slate-500'}">${subtitle}</div>
+    </div>
+  </div>`;
+}
+
+function setTab(tab){ activeTab = tab; render(); }
+
+function tallyFindings(cycle){
+  const c = { Verified:0, Missing:0, Damaged:0, Pending:0 };
+  cycle.findings.forEach(f => c[f.status]++);
+  c.flagged = c.Missing + c.Damaged;
+  return c;
+}
+
+/* ---------- Phase 2 / 3 tab content ---------- */
+function renderTabContent(cycle, closed){
+  const target = document.getElementById('tab-content');
+  const assets = DataStore.getAssets();
+
+  if(activeTab === 'verification'){
+    target.innerHTML = `
+      <div class="card overflow-hidden">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-left text-xs text-slate-400 border-b" style="border-color:var(--slate-200);">
+              <th class="px-5 py-3 font-semibold">Asset</th>
+              <th class="px-5 py-3 font-semibold">Category</th>
+              <th class="px-5 py-3 font-semibold">Department</th>
+              <th class="px-5 py-3 font-semibold">Finding</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${cycle.findings.map(f => {
+              const asset = assets.find(a=>a.id===f.assetId);
+              const rowFlag = f.status==='Missing' ? 'missing' : f.status==='Damaged' ? 'damaged' : '';
+              return `
+              <tr class="border-b last:border-0 row-flag ${rowFlag}" style="border-color:var(--slate-100);">
+                <td class="px-5 py-3">
+                  <div class="font-semibold text-slate-800">${asset.name}</div>
+                  <div class="text-xs text-slate-400 font-data">${asset.id}</div>
+                </td>
+                <td class="px-5 py-3 text-slate-500">${asset.category}</td>
+                <td class="px-5 py-3 text-slate-500">${asset.department}</td>
+                <td class="px-5 py-3">
+                  <div class="flex gap-1.5">
+                    ${toggleBtn(f.assetId,'Verified', f.status, closed)}
+                    ${toggleBtn(f.assetId,'Missing', f.status, closed)}
+                    ${toggleBtn(f.assetId,'Damaged', f.status, closed)}
+                  </div>
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+      ${closed ? `<p class="text-xs text-slate-400 mt-3">This audit is closed — findings are locked and read-only.</p>` : ''}
+    `;
+  } else {
+    const flagged = cycle.findings.filter(f => f.status==='Missing' || f.status==='Damaged');
+    target.innerHTML = `
+      <div class="card overflow-hidden">
+        ${flagged.length === 0 ? `
+          <div class="p-10 text-center">
+            <div class="text-sm font-semibold text-slate-700">No discrepancies yet</div>
+            <div class="text-xs text-slate-400 mt-1">Assets marked Missing or Damaged during verification appear here in real time.</div>
+          </div>` : `
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-left text-xs text-slate-400 border-b" style="border-color:var(--slate-200);">
+              <th class="px-5 py-3 font-semibold">Asset</th>
+              <th class="px-5 py-3 font-semibold">Department</th>
+              <th class="px-5 py-3 font-semibold">Finding</th>
+              <th class="px-5 py-3 font-semibold">Resulting master status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${flagged.map(f => {
+              const asset = assets.find(a=>a.id===f.assetId);
+              const resulting = f.status==='Missing' ? 'Lost' : 'Damaged';
+              return `
+              <tr class="border-b last:border-0 row-flag ${f.status.toLowerCase()}" style="border-color:var(--slate-100);">
+                <td class="px-5 py-3">
+                  <div class="font-semibold text-slate-800">${asset.name}</div>
+                  <div class="text-xs text-slate-400 font-data">${asset.id}</div>
+                </td>
+                <td class="px-5 py-3 text-slate-500">${asset.department}</td>
+                <td class="px-5 py-3">${pill(f.status)}</td>
+                <td class="px-5 py-3">${closed ? pill(resulting) : `<span class="text-xs text-slate-400">on closure → ${resulting}</span>`}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>`}
+      </div>
+    `;
+  }
+}
+
+function toggleBtn(assetId, status, current, disabled){
+  const cls = current === status ? 'sel-' + status.toLowerCase() : '';
+  return `<button ${disabled?'disabled':''} class="toggle-btn ${cls}" onclick="handleSetFinding('${assetId}','${status}')">${status}</button>`;
+}
+
+function handleSetFinding(assetId, status){
+  const cycle = DataStore.getCurrentCycle();
+  const f = cycle.findings.find(f=>f.assetId===assetId);
+  // clicking the already-selected status resets to Pending
+  DataStore.doSetFinding(assetId, f.status === status ? 'Pending' : status);
+  render();
+}
+
+/* ---------- Phase 4: Closure ---------- */
+function closeModalShow(){
+  const cycle = DataStore.getCurrentCycle();
+  const counts = tallyFindings(cycle);
+  document.getElementById('close-modal-summary').innerHTML =
+    `${counts.Verified} verified · ${counts.Missing} missing (→ Lost) · ${counts.Damaged} damaged · ${counts.Pending} still pending`;
+  document.getElementById('close-modal').classList.remove('hidden');
+}
+function closeModalHide(){ document.getElementById('close-modal').classList.add('hidden'); }
+function confirmCloseCycle(){
+  DataStore.doCloseCycle();
+  closeModalHide();
+  activeTab = 'verification';
+  render();
+}
+
+/* ---------- History ---------- */
+function renderHistory(){
+  const cycles = DataStore.getCycles().filter(c => c.status === 'Closed');
+  document.getElementById('history-count').textContent = cycles.length + ' closed cycle(s)';
+  const target = document.getElementById('view-history');
+
+  if(cycles.length === 0){
+    target.innerHTML = `<div class="p-8 text-center text-sm text-slate-400">No closed audit cycles yet. History appears here once a cycle is closed.</div>`;
+    return;
+  }
+
+  target.innerHTML = `
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-left text-xs text-slate-400 border-b" style="border-color:var(--slate-200);">
+          <th class="px-5 py-3 font-semibold">Cycle</th>
+          <th class="px-5 py-3 font-semibold">Scope</th>
+          <th class="px-5 py-3 font-semibold">Auditor</th>
+          <th class="px-5 py-3 font-semibold">Closed</th>
+          <th class="px-5 py-3 font-semibold">Findings</th>
+          <th class="px-5 py-3 font-semibold"></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${cycles.slice().reverse().map(c => {
+          const counts = tallyFindings(c);
+          return `
+          <tr class="border-b last:border-0 cursor-pointer hover:bg-slate-50" style="border-color:var(--slate-100);" onclick="historyModalShow('${c.id}')">
+            <td class="px-5 py-3">
+              <div class="font-semibold text-slate-800">${c.name}</div>
+              <div class="text-xs text-slate-400 font-data">${c.id}</div>
+            </td>
+            <td class="px-5 py-3 text-slate-500">${c.department}</td>
+            <td class="px-5 py-3 text-slate-500">${c.auditor}</td>
+            <td class="px-5 py-3 text-slate-500 text-xs font-data">${new Date(c.closedAt).toLocaleDateString()}</td>
+            <td class="px-5 py-3">
+              <div class="flex gap-1.5">
+                <span class="text-xs font-semibold" style="color:var(--emerald-600);">${counts.Verified}✓</span>
+                <span class="text-xs font-semibold" style="color:var(--amber-600);">${counts.Missing}⚠</span>
+                <span class="text-xs font-semibold" style="color:var(--red-600);">${counts.Damaged}✕</span>
+              </div>
+            </td>
+            <td class="px-5 py-3 text-xs text-slate-400">View →</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function historyModalShow(cycleId){
+  const cycle = DataStore.getCycles().find(c=>c.id===cycleId);
+  const assets = DataStore.getAssets();
+  const flagged = cycle.findings.filter(f=>f.status==='Missing'||f.status==='Damaged');
+  document.getElementById('history-modal-content').innerHTML = `
+    <div class="flex items-start justify-between mb-4">
+      <div>
+        <div class="text-xs text-slate-400 font-data">${cycle.id}</div>
+        <h3 class="text-lg font-bold">${cycle.name}</h3>
+        <div class="text-xs text-slate-500 mt-1">${cycle.department} · Auditor: ${cycle.auditor} · ${cycle.startDate} → ${cycle.endDate}</div>
+      </div>
+      ${pill('Closed')}
+    </div>
+    ${flagged.length === 0 ? `<p class="text-sm text-slate-500">No discrepancies were found in this cycle — all assets verified.</p>` : `
+    <table class="w-full text-sm border-t" style="border-color:var(--slate-200);">
+      <thead>
+        <tr class="text-left text-xs text-slate-400">
+          <th class="py-2 font-semibold">Asset</th>
+          <th class="py-2 font-semibold">Finding</th>
+          <th class="py-2 font-semibold">Master status set</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${flagged.map(f=>{
+          const asset = assets.find(a=>a.id===f.assetId);
+          return `<tr class="border-t" style="border-color:var(--slate-100);">
+            <td class="py-2">${asset.name} <span class="text-xs text-slate-400 font-data">(${asset.id})</span></td>
+            <td class="py-2">${pill(f.status)}</td>
+            <td class="py-2">${pill(asset.status)}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`}
+  `;
+  document.getElementById('history-modal').classList.remove('hidden');
+}
+function historyModalHide(){ document.getElementById('history-modal').classList.add('hidden'); }
+
+/* Init */
+render();
+</script>
+</body>
+</html>
