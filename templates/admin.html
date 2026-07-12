@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AssetTrack — Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased" x-data="adminApp()" x-init="init()">
+  <div class="container">
+    <div class="topbar">
+      <div>
+        <h1 class="header-title">Admin Console</h1>
+        <p class="header-subtitle">Manage departments, assets, users, and system state.</p>
+      </div>
+      <div class="panel-row">
+        <a href="{{ url_for('dashboard') }}" class="button">Dashboard</a>
+        <a href="{{ url_for('logout') }}" class="button-secondary">Logout</a>
+        <button type="button" class="tab-button" :class="activeTab === 'users' ? 'active' : ''" @click="activeTab='users'">Users</button>
+        <button type="button" class="tab-button" :class="activeTab === 'departments' ? 'active' : ''" @click="activeTab='departments'">Departments</button>
+      </div>
+
+      <div class="panel" x-show="activeTab==='assets'">
+        <div class="panel-header">
+          <h2>All Assets</h2>
+          <button class="button" @click="openAssetForm = true; resetAssetForm()">Add Asset</button>
+        </div>
+
+        <div class="table-wrapper">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Tag</th>
+                <th>Category</th>
+                <th>Condition</th>
+                <th>Location</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="asset in assets" :key="asset.asset_id">
+                <tr>
+                  <td x-text="asset.asset_id"></td>
+                  <td x-text="asset.name"></td>
+                  <td x-text="asset.asset_tag"></td>
+                  <td x-text="asset.category_name || '—'"></td>
+                  <td x-text="asset.condition"></td>
+                  <td x-text="asset.location"></td>
+                  <td>
+                    <span class="badge" :class="asset.status === 'Active' ? 'badge-active' : asset.status === 'Inactive' ? 'badge-inactive' : 'badge-available'" x-text="asset.status"></span>
+                  </td>
+                  <td>
+                    <button class="button-secondary" @click="editAsset(asset)">Edit</button>
+                    <button class="button-danger" @click="deleteAsset(asset.asset_id)">Delete</button>
+                  </td>
+                </tr>
+              </template>
+              <tr x-show="assets.length === 0">
+                <td colspan="8" class="text-center text-slate-500 py-6">No assets found.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel" x-show="activeTab==='users'">
+        <div class="panel-header">
+          <h2>Users</h2>
+          <button class="button" @click="openUserForm = true; resetUserForm()">Add User</button>
+        </div>
+
+        <div class="table-wrapper">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Department</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="user in users" :key="user.employee_id">
+                <tr>
+                  <td x-text="user.employee_id"></td>
+                  <td x-text="user.name"></td>
+                  <td x-text="user.email"></td>
+                  <td x-text="user.department_name || '—'"></td>
+                  <td x-text="user.role"></td>
+                  <td>
+                    <span class="badge" :class="user.status === 'Active' ? 'badge-active' : 'badge-inactive'" x-text="user.status"></span>
+                  </td>
+                  <td>
+                    <button class="button-secondary" @click="editUser(user)">Edit</button>
+                    <button class="button-danger" @click="deleteUser(user.employee_id)">Delete</button>
+                  </td>
+                </tr>
+              </template>
+              <tr x-show="users.length === 0">
+                <td colspan="7" class="text-center text-slate-500 py-6">No users found.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel" x-show="activeTab==='departments'">
+        <div class="panel-header">
+          <h2>Departments</h2>
+          <button class="button" @click="openDepartmentForm = true; resetDepartmentForm()">Add Department</button>
+        </div>
+
+        <div class="table-wrapper">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="dept in departments" :key="dept.department_id">
+                <tr>
+                  <td x-text="dept.department_id"></td>
+                  <td x-text="dept.department_name"></td>
+                  <td>
+                    <span class="badge" :class="dept.status === 'Active' ? 'badge-active' : 'badge-inactive'" x-text="dept.status"></span>
+                  </td>
+                  <td>
+                    <button class="button-secondary" @click="editDepartment(dept)">Edit</button>
+                    <button class="button-danger" @click="deleteDepartment(dept.department_id)">Delete</button>
+                  </td>
+                </tr>
+              </template>
+              <tr x-show="departments.length === 0">
+                <td colspan="4" class="text-center text-slate-500 py-6">No departments found.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel" x-show="openAssetForm">
+        <div class="panel-header">
+          <h2 x-text="assetForm.asset_id ? 'Edit Asset' : 'Add Asset'"></h2>
+          <button class="button-secondary" @click="openAssetForm=false">Close</button>
+        </div>
+        <div class="form-grid">
+          <div>
+            <label class="form-label">Name</label>
+            <input class="input" type="text" x-model="assetForm.name" placeholder="Asset name">
+          </div>
+          <div>
+            <label class="form-label">Tag</label>
+            <input class="input" type="text" x-model="assetForm.asset_tag" placeholder="Asset tag">
+          </div>
+          <div>
+            <label class="form-label">Category</label>
+            <input class="input" type="text" x-model="assetForm.category_name" placeholder="Category">
+          </div>
+          <div>
+            <label class="form-label">Condition</label>
+            <input class="input" type="text" x-model="assetForm.condition" placeholder="Condition">
+          </div>
+          <div>
+            <label class="form-label">Location</label>
+            <input class="input" type="text" x-model="assetForm.location" placeholder="Location">
+          </div>
+          <div>
+            <label class="form-label">Status</label>
+            <select class="select" x-model="assetForm.status">
+              <option value="Available">Available</option>
+              <option value="Allocated">Allocated</option>
+              <option value="Reserved">Reserved</option>
+              <option value="Under Maintenance">Under Maintenance</option>
+              <option value="Lost">Lost</option>
+              <option value="Retired">Retired</option>
+              <option value="Disposed">Disposed</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Bookable</label>
+            <select class="select" x-model="assetForm.is_bookable">
+              <option :value="true">Yes</option>
+              <option :value="false">No</option>
+            </select>
+          </div>
+        </div>
+        <div class="panel-row">
+          <button class="button" @click="saveAsset()">Save Asset</button>
+          <button class="button-secondary" @click="openAssetForm=false">Cancel</button>
+        </div>
+      </div>
+
+      <div class="panel" x-show="openUserForm">
+        <div class="panel-header">
+          <h2 x-text="userForm.employee_id ? 'Edit User' : 'Add User'"></h2>
+          <button class="button-secondary" @click="openUserForm=false">Close</button>
+        </div>
+        <div class="form-grid">
+          <div>
+            <label class="form-label">Name</label>
+            <input class="input" type="text" x-model="userForm.name" placeholder="User name">
+          </div>
+          <div>
+            <label class="form-label">Email</label>
+            <input class="input" type="email" x-model="userForm.email" placeholder="Email">
+          </div>
+          <div>
+            <label class="form-label">Role</label>
+            <select class="select" x-model="userForm.role">
+              <option value="Admin">Admin</option>
+              <option value="Asset Manager">Asset Manager</option>
+              <option value="Department Head">Department Head</option>
+              <option value="Employee">Employee</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Department</label>
+            <input class="input" type="text" x-model="userForm.department_name" placeholder="Department">
+          </div>
+          <div>
+            <label class="form-label">Status</label>
+            <select class="select" x-model="userForm.status">
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Password</label>
+            <input class="input" type="password" x-model="userForm.password" placeholder="Password">
+          </div>
+        </div>
+        <div class="panel-row">
+          <button class="button" @click="saveUser()">Save User</button>
+          <button class="button-secondary" @click="openUserForm=false">Cancel</button>
+        </div>
+      </div>
+
+      <div class="panel" x-show="openDepartmentForm">
+        <div class="panel-header">
+          <h2 x-text="departmentForm.department_id ? 'Edit Department' : 'Add Department'"></h2>
+          <button class="button-secondary" @click="openDepartmentForm=false">Close</button>
+        </div>
+        <div class="form-grid">
+          <div>
+            <label class="form-label">Department Name</label>
+            <input class="input" type="text" x-model="departmentForm.department_name" placeholder="Department name">
+          </div>
+          <div>
+            <label class="form-label">Status</label>
+            <select class="select" x-model="departmentForm.status">
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          </div>
+        </div>
+        <div class="panel-row">
+          <button class="button" @click="saveDepartment()">Save Department</button>
+          <button class="button-secondary" @click="openDepartmentForm=false">Cancel</button>
+        </div>
+      </div>
+
+      <div :class="['toast', toastVisible ? 'show' : '']" x-text="toastMessage"></div>
+    </div>
+  </div>
+
+<script>
+function adminApp() {
+  return {
+    activeTab: 'assets',
+    assets: [],
+    users: [],
+    departments: [],
+    openAssetForm: false,
+    openUserForm: false,
+    openDepartmentForm: false,
+    assetForm: {},
+    userForm: {},
+    departmentForm: {},
+    toastVisible: false,
+    toastMessage: '',
+
+    init() {
+      this.loadAssets();
+      this.loadUsers();
+      this.loadDepartments();
+    },
+
+    notify(message) {
+      this.toastMessage = message;
+      this.toastVisible = true;
+      setTimeout(() => this.toastVisible = false, 2500);
+    },
+
+    loadAssets() {
+      fetch('/api/assets')
+        .then(res => res.json())
+        .then(data => this.assets = data)
+        .catch(() => this.notify('Failed to load assets.'));
+    },
+
+    loadUsers() {
+      fetch('/api/users')
+        .then(res => res.json())
+        .then(data => this.users = data)
+        .catch(() => this.notify('Failed to load users.'));
+    },
+
+    loadDepartments() {
+      fetch('/api/departments')
+        .then(res => res.json())
+        .then(data => this.departments = data)
+        .catch(() => this.notify('Failed to load departments.'));
+    },
+
+    resetAssetForm() {
+      this.assetForm = { is_bookable: false, status: 'Available' };
+    },
+
+    resetUserForm() {
+      this.userForm = { role: 'Employee', status: 'Active' };
+    },
+
+    resetDepartmentForm() {
+      this.departmentForm = { status: 'Active' };
+    },
+
+    editAsset(asset) {
+      this.openAssetForm = true;
+      this.assetForm = { ...asset, is_bookable: Boolean(asset.is_bookable) };
+    },
+
+    editUser(user) {
+      this.openUserForm = true;
+      this.userForm = { ...user, password: '' };
+    },
+
+    editDepartment(department) {
+      this.openDepartmentForm = true;
+      this.departmentForm = { ...department };
+    },
+
+    saveAsset() {
+      const payload = { ...this.assetForm };
+      const method = payload.asset_id ? 'PUT' : 'POST';
+      const url = payload.asset_id ? `/api/assets/${payload.asset_id}` : '/api/assets';
+      fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      .then(res => res.ok ? res.json() : res.json().then(err => Promise.reject(err)))
+      .then(() => {
+        this.openAssetForm = false;
+        this.loadAssets();
+        this.notify('Asset saved.');
+      })
+      .catch(err => this.notify(err.error || 'Failed to save asset.'));
+    },
+
+    deleteAsset(id) {
+      if (!confirm('Delete this asset?')) return;
+      fetch(`/api/assets/${id}`, { method: 'DELETE' })
+        .then(res => res.ok ? res.json() : Promise.reject())
+        .then(() => {
+          this.loadAssets();
+          this.notify('Asset deleted.');
+        })
+        .catch(() => this.notify('Failed to delete asset.'));
+    },
+
+    saveUser() {
+      const payload = { ...this.userForm };
+      const method = payload.employee_id ? 'PUT' : 'POST';
+      const url = payload.employee_id ? `/api/users/${payload.employee_id}` : '/api/users';
+      fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      .then(res => res.ok ? res.json() : res.json().then(err => Promise.reject(err)))
+      .then(() => {
+        this.openUserForm = false;
+        this.loadUsers();
+        this.notify('User saved.');
+      })
+      .catch(err => this.notify(err.error || 'Failed to save user.'));
+    },
+
+    deleteUser(id) {
+      if (!confirm('Delete this user?')) return;
+      fetch(`/api/users/${id}`, { method: 'DELETE' })
+        .then(res => res.ok ? res.json() : Promise.reject())
+        .then(() => {
+          this.loadUsers();
+          this.notify('User deleted.');
+        })
+        .catch(() => this.notify('Failed to delete user.'));
+    },
+
+    saveDepartment() {
+      const payload = { ...this.departmentForm };
+      const method = payload.department_id ? 'PUT' : 'POST';
+      const url = payload.department_id ? `/api/departments/${payload.department_id}` : '/api/departments';
+      fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      .then(res => res.ok ? res.json() : res.json().then(err => Promise.reject(err)))
+      .then(() => {
+        this.openDepartmentForm = false;
+        this.loadDepartments();
+        this.notify('Department saved.');
+      })
+      .catch(err => this.notify(err.error || 'Failed to save department.'));
+    },
+
+    deleteDepartment(id) {
+      if (!confirm('Delete this department?')) return;
+      fetch(`/api/departments/${id}`, { method: 'DELETE' })
+        .then(res => res.ok ? res.json() : Promise.reject())
+        .then(() => {
+          this.loadDepartments();
+          this.loadUsers();
+          this.notify('Department deleted.');
+        })
+        .catch(() => this.notify('Failed to delete department.'));
+    }
+  }
+}
+</script>
+</body>
+</html>
