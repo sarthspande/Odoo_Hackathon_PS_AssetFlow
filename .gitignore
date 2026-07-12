@@ -2,3 +2,4 @@ data.json
 tempini.py
 .venv
 .env
+__pycache__
