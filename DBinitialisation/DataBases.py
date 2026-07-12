@@ -1,4 +1,5 @@
 from . import db
+from datetime import datetime
 class Department(db.Model):
     __tablename__ = 'departments'
     department_id = db.Column(db.Integer, primary_key=True)

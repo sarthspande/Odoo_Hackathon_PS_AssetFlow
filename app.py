@@ -1,8 +1,10 @@
 from datetime import datetime
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO
+from pathlib import Path
 from werkzeug.security import generate_password_hash
-from DBinitialisation.DataBases import db, Department, Employee, ActivityLog
+from DBinitialisation import init_db
+from DBinitialisation.DataBases import Department, Employee, ActivityLog
 import os
 from dotenv import load_dotenv
 load_dotenv()
@@ -10,11 +12,14 @@ load_dotenv()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv("API_KEY") or 'change-me'
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///assetflow.db')
+db_file = Path(app.root_path) / 'assetflow.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', f"sqlite:///{db_file.as_posix()}")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-db.init_app(app)
+init_db(app)
 socketio = SocketIO(app, cors_allowed_origins='*')
+
+from DBinitialisation import db
 
 @app.route('/login', methods=['GET','POST'])
 def login():
