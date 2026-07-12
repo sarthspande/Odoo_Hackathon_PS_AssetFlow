@@ -20,6 +20,7 @@ FlowCore is a modern, full-stack Asset Management System built using Python (Fla
 ## 🗄️ Database Schema & Data Model
 FlowCore uses SQLAlchemy ORM to enforce structure and relationships over an SQLite storage engine. The application separates operational data into clear domains: organizational hierarchies, asset tracking lifecycle vectors, scheduling blocks, maintenance requests, and internal compliance audits.
 
+```
                                ┌─────────────────┐
                                │   Department    │◄────────┐
                                └────────┬────────┘         │
@@ -52,7 +53,7 @@ FlowCore uses SQLAlchemy ORM to enforce structure and relationships over an SQLi
                                ┌────────▼────────┐
                                │   Allocation    │
                                └─────────────────┘
-
+```
 
 ## 🛠️ Technology Stack
 
